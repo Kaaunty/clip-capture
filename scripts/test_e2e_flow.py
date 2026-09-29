@@ -18,12 +18,6 @@ import http.server
 import json
 import os
 from pathlib import Path
-import sys
-
-# Ensure repository root is on sys.path
-REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
 import secrets
 import shutil
 import sqlite3
@@ -35,6 +29,13 @@ import time
 from typing import Any
 
 from fastapi.testclient import TestClient
+import httpx
+
+# Ensure repository root is strictly anchored regardless of invocation CWD
+REPO_ROOT = Path(__file__).resolve().parent.parent
+os.chdir(REPO_ROOT)
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from apps.agent.src.buffer import CircularBufferManager
 from apps.agent.src.config import AgentConfig
@@ -362,11 +363,19 @@ def resolve_share_token_py(raw_token: str, central_db_path: Path | str) -> dict[
         }
 
 
-def verify_via_typescript_resolver(central_db_path: Path, raw_token: str) -> dict[str, Any] | None:
-    """Verifies share token resolution by running the actual TypeScript function in apps/web."""
-    temp_ts = Path("apps/web/_temp_e2e_verify_token.ts")
+def verify_via_typescript_resolver(
+    central_db_path: Path, raw_token: str, temp_dir: Path | None = None
+) -> dict[str, Any] | None:
+    """Verifies share token resolution by running the actual TypeScript function in apps/web.
+
+    Creates the temporary runner script in a designated temporary directory so apps/web is untouched.
+    """
+    runner_dir = temp_dir or Path(tempfile.gettempdir())
+    temp_ts = runner_dir / f"_temp_e2e_verify_{secrets.token_hex(6)}.ts"
+    tokens_module_path = (REPO_ROOT / "apps/web/src/lib/tokens").resolve().as_posix()
+
     ts_code = f"""
-import {{ resolveShareToken }} from './src/lib/tokens';
+import {{ resolveShareToken }} from '{tokens_module_path}';
 
 async function main() {{
   const resolved = await resolveShareToken('{raw_token}');
@@ -383,11 +392,12 @@ main().catch(err => {{
         env = dict(os.environ)
         env["DATABASE_URL"] = f"file:{central_db_path.resolve()}"
         res = subprocess.run(
-            ["npx", "--prefix", "apps/web", "vite-node", str(temp_ts)],
+            ["npx", "--prefix", str(REPO_ROOT / "apps/web"), "vite-node", str(temp_ts)],
             capture_output=True,
             text=True,
             check=True,
             env=env,
+            cwd=str(REPO_ROOT / "apps/web"),
         )
         output = res.stdout
         if "__E2E_RESOLVED_START__" in output:
@@ -396,7 +406,10 @@ main().catch(err => {{
         return None
     finally:
         if temp_ts.exists():
-            temp_ts.unlink()
+            try:
+                temp_ts.unlink()
+            except OSError:
+                pass
 
 
 def main() -> None:
@@ -406,7 +419,7 @@ def main() -> None:
 
     work_dir = Path(tempfile.mkdtemp(prefix="clip_capture_e2e_"))
     try:
-        # Paths setup
+        # Anchored paths setup
         central_db_path = work_dir / "central_dev.db"
         central_storage_dir = work_dir / "central_storage"
         agent_buffer_dir = work_dir / "agent_buffer"
@@ -415,8 +428,7 @@ def main() -> None:
         agent_buffer_dir.mkdir(parents=True, exist_ok=True)
 
         print("[E2E] Step 1: Initializing Central Database & Mock Central Server...")
-        # Seed central database copying schema from prisma dev.db
-        source_dev_db = Path("apps/web/prisma/dev.db")
+        source_dev_db = REPO_ROOT / "apps/web/prisma/dev.db"
         if not source_dev_db.exists():
             raise FileNotFoundError(f"Prisma reference db not found at {source_dev_db}")
 
@@ -551,42 +563,28 @@ def main() -> None:
         assert data_dup["event_id"] == event_id, f"Expected event_id={event_id}, got {data_dup.get('event_id')}"
         print("      Duplicate trigger rejected idempotently as DUPLICATE_IGNORED")
 
-        print("[E2E] Step 5: Running Clip Extraction (cam1 active, cam2 offline)...")
-        # Run multi-camera extraction for event
-        extraction_results = extractor.extract_event_clips(
-            event_id=event_id,
-            trigger_ts=trigger_ts,
-            profile=agent_config.default_profile,
-            cameras=agent_config.cameras,
-        )
-
-        r_cam1 = next(r for r in extraction_results if r.camera_id == "cam1")
-        r_cam2 = next(r for r in extraction_results if r.camera_id == "cam2")
-
-        # Assert cam1 generated valid MP4
-        assert r_cam1.status == "EXTRACTED", f"cam1 status: {r_cam1.status}"
-        assert r_cam1.output_path is not None and r_cam1.output_path.exists(), "cam1 clip missing on disk"
-        assert r_cam1.output_path.stat().st_size > 0, "cam1 clip is empty"
-        assert r_cam1.duration == 3.0, f"Expected duration 3.0s, got {r_cam1.duration}"
-
-        # Assert cam2 is marked CAMERA_UNAVAILABLE
-        assert r_cam2.status == "CAMERA_UNAVAILABLE", f"cam2 status: {r_cam2.status}"
-        assert r_cam2.output_path is None, "cam2 should not have an output file"
-
-        # Retrieve jobs scheduled by background extraction
+        print("[E2E] Step 5: Asserting Background Extraction Jobs (cam1 active, cam2 offline)...")
+        # The trigger request in Step 3 scheduled and executed background extraction via FastAPI BackgroundTasks
         event_clips = queue_mgr.get_event_clips(event_id)
-        if not event_clips:
-            # If not yet scheduled by background task, schedule explicitly
-            event_clips = queue_mgr.schedule_extraction(event_id, trigger_ts)
-        assert len(event_clips) == 1, f"Expected 1 clip job (cam1), got {len(event_clips)}"
+        assert len(event_clips) == 1, f"Expected exactly 1 extracted clip job for cam1, got {len(event_clips)}"
+
         cam1_job = event_clips[0]
-        assert cam1_job.camera_id == "cam1"
-        assert cam1_job.status == "EXTRACTED"
-        print(f"      cam1 clip generated ({r_cam1.output_path.stat().st_size} bytes, status=EXTRACTED)")
-        print(f"      cam2 marked CAMERA_UNAVAILABLE as expected")
+        assert cam1_job.camera_id == "cam1", f"Expected cam1 job, got {cam1_job.camera_id}"
+        assert cam1_job.status == "EXTRACTED", f"Expected status EXTRACTED, got {cam1_job.status}"
+        cam1_clip_path = Path(cam1_job.file_path)
+        assert cam1_clip_path.exists(), f"cam1 clip missing on disk: {cam1_clip_path}"
+        assert cam1_clip_path.stat().st_size > 0, "cam1 clip is empty"
+        assert cam1_job.duration == 3.0, f"Expected duration 3.0s, got {cam1_job.duration}"
+
+        # cam2 was offline / inactive, so assert no clip job exists for cam2
+        cam2_jobs = [c for c in event_clips if c.camera_id == "cam2"]
+        assert len(cam2_jobs) == 0, f"Offline camera cam2 should not have extracted jobs, found: {cam2_jobs}"
+
+        print(f"      cam1 clip verified: {cam1_clip_path.name} ({cam1_clip_path.stat().st_size} bytes, status=EXTRACTED, duration={cam1_job.duration}s)")
+        print("      cam2 has no queue jobs (offline / unavailable as expected)")
 
         print("[E2E] Step 6: Running Upload Worker (Compute SHA-256, Upload to Central, Assert READY in DB)...")
-        expected_checksum = calculate_file_checksum(r_cam1.output_path)
+        expected_checksum = calculate_file_checksum(cam1_clip_path)
         upload_worker = UploadWorker(
             queue_mgr=queue_mgr,
             central_api_url=central_url,
@@ -617,7 +615,6 @@ def main() -> None:
         print("      Central DB record verified: uploadStatus=READY, sha256 verified")
 
         print("[E2E] Step 7: Generating Share Token (POST /api/v1/events/[id]/share)...")
-        import httpx
         with httpx.Client(base_url=central_url) as central_client:
             share_resp = central_client.post(f"/api/v1/events/{event_id}/share")
             assert share_resp.status_code == 201, f"Share token request failed: {share_resp.status_code} {share_resp.text}"
@@ -662,7 +659,7 @@ def main() -> None:
         print(f"      Angle 2 ({angle_cam2['cameraName']}): status={angle_cam2['status']}, videoUrl=None (Unavailable)")
 
         print("[E2E] Step 9: Cross-Runtime Verification via TypeScript resolveShareToken...")
-        ts_resolved = verify_via_typescript_resolver(central_db_path, raw_token)
+        ts_resolved = verify_via_typescript_resolver(central_db_path, raw_token, temp_dir=work_dir)
         assert ts_resolved is not None, "TypeScript resolveShareToken returned null"
         assert ts_resolved.get("eventId") == event_id, f"TypeScript resolved eventId mismatch: {ts_resolved.get('eventId')}"
         ts_files = ts_resolved.get("files", [])

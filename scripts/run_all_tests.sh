@@ -21,8 +21,8 @@ echo "--> [2/4] Running Next.js Web Test Suite (npm --prefix apps/web test)..."
 npm --prefix apps/web test
 
 echo ""
-echo "--> [3/4] Running Next.js Production Build (npx --prefix apps/web next build)..."
-npx --prefix apps/web next build apps/web
+echo "--> [3/4] Running Next.js Production Build (npm --prefix apps/web run build)..."
+npm --prefix apps/web run build
 
 echo ""
 echo "--> [4/4] Running End-to-End Orchestration Test (python3 scripts/test_e2e_flow.py)..."
