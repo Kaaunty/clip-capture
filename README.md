@@ -57,10 +57,32 @@ Clip Capture provides edge-buffered RTSP video recording, physical and remote ev
 
 ## Getting Started
 
-### Prerequisites
+### 🚀 Quick Start com Docker (Recomendado)
+
+Inicie toda a aplicação (Central Web + Agente Local + Fila SQLite + Simulador de Câmeras) com um único comando:
+
+```bash
+docker compose up -d
+```
+
+Acesse imediatamente no seu navegador:
+- **Página Inicial & Lances:** [http://localhost:3000](http://localhost:3000)
+- **Painel Administrativo do Campo:** [http://localhost:3000/admin/fields](http://localhost:3000/admin/fields) *(com botão de contingência para gravar lances ao vivo)*
+- **Health Check do Agente Local:** [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)
+
+Para parar os containers:
+```bash
+docker compose down
+```
+
+---
+
+### Execução Manual sem Docker
+
+#### Pré-requisitos
 - Python 3.11+
-- Node.js 20+ and npm
-- FFmpeg (for video extraction and segment stitching)
+- Node.js 20+ e npm
+- FFmpeg instalado no sistema (`sudo apt install ffmpeg`)
 
 ### 1. Local Agent (`apps/agent`)
 

@@ -6,6 +6,8 @@ import {
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 export interface StorageServiceOptions {
   mock?: boolean;
@@ -103,6 +105,19 @@ export class StorageService {
         contentType,
         updatedAt: new Date(),
       });
+
+      // If local storage driver or storage dir specified, save to disk
+      if (process.env.STORAGE_DRIVER === 'local' || process.env.STORAGE_DIR) {
+        try {
+          const storageDir = process.env.STORAGE_DIR || path.join(process.cwd(), 'storage');
+          const destPath = path.join(storageDir, key);
+          fs.mkdirSync(path.dirname(destPath), { recursive: true });
+          fs.writeFileSync(destPath, buffer);
+        } catch (e) {
+          // ignore disk save error in read-only environments
+        }
+      }
+
       return {
         key,
         etag: `"${crypto.createHash('md5').update(buffer).digest('hex')}"`,
@@ -147,6 +162,11 @@ export class StorageService {
     key: string,
     expiresInSeconds: number = 3600,
   ): Promise<string> {
+    if (process.env.STORAGE_DRIVER === 'local' || process.env.NEXT_PUBLIC_STORAGE_DRIVER === 'local') {
+      const baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+      return `${baseUrl.replace(/\/$/, '')}/api/v1/storage/${key}`;
+    }
+
     if (this.isMockMode || !this.client || !this.accessKeyId || !this.secretAccessKey) {
       return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}?mock-presigned=get&expires=${Date.now() + expiresInSeconds * 1000}`;
     }
@@ -160,7 +180,18 @@ export class StorageService {
   public async getObject(key: string): Promise<Buffer | null> {
     if (this.isMockMode || !this.client) {
       const item = this.mockStore.get(key);
-      return item ? item.data : null;
+      if (item) return item.data;
+
+      const storageDir = process.env.STORAGE_DIR || path.join(process.cwd(), 'storage');
+      const filePath = path.join(storageDir, key);
+      if (fs.existsSync(filePath)) {
+        try {
+          return fs.readFileSync(filePath);
+        } catch {
+          return null;
+        }
+      }
+      return null;
     }
 
     try {

@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: clip-capture-web
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=file:/app/prisma/data/dev.db
+      - STORAGE_DRIVER=local
+      - STORAGE_DIR=/app/storage
+      - FIELD_AGENT_URL=http://agent:8000
+      - FIELD_AGENT_DEVICE_TOKEN=clip-capture-secret-demo-token
+      - ADMIN_API_KEY=clip-capture-secret-demo-token
+      - APP_BASE_URL=http://localhost:3000
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    volumes:
+      - web_db:/app/prisma/data
+      - web_storage:/app/storage
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: .
+      dockerfile: apps/agent/Dockerfile
+    container_name: clip-capture-agent
+    ports:
+      - "8000:8000"
+    environment:
+      - FIELD_ID=campo-1
+      - CENTRAL_API_URL=http://web:3000
+      - DEVICE_TOKEN=clip-capture-secret-demo-token
+      - BUFFER_DIR=/app/buffer
+      - DB_PATH=/app/data/queue.db
+      - PORT=8000
+      - MOCK_CAMERA_FEED=true
+    volumes:
+      - agent_buffer:/app/buffer
+      - agent_data:/app/data
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  web_db:
+  web_storage:
+  agent_buffer:
+  agent_data:
