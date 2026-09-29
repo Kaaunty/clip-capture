@@ -13,5 +13,5 @@ __pycache__/
 .coverage
 *.db
 *.mp4
-*.ts
 *.m3u8
+.venv/
