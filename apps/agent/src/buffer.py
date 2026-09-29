@@ -241,12 +241,17 @@ class CircularBufferManager:
                         if is_protected:
                             retained_segs.append(seg)
                         else:
+                            success = True
                             try:
                                 if seg.segment_path.exists():
                                     seg.segment_path.unlink()
                             except OSError:
-                                pass
-                            pruned_count += 1
+                                success = False
+                            
+                            if success:
+                                pruned_count += 1
+                            else:
+                                retained_segs.append(seg)
                     else:
                         retained_segs.append(seg)
 

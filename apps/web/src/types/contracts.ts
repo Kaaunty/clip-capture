@@ -72,9 +72,12 @@ export interface DeviceContract {
   fieldId: string;
   deviceType: 'BUTTON' | 'AGENT' | 'OTHER';
   identifier: string;
+  secretToken?: string;
   credentialHash?: string;
   lastSeenAt?: string | Date;
+  lastHeartbeatAt?: string | Date;
   createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface ClipEventContract {

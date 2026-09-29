@@ -184,3 +184,25 @@ def test_get_segment_info(tmp_path):
     assert mgr.get_segment_info("cam1", tmp_path / "nonexistent.mp4") is None
     assert mgr.get_segment_info("cam2", seg1) is None
 
+
+def test_prune_retains_unlinked_on_oserror(tmp_path, monkeypatch):
+    mgr = CircularBufferManager(buffer_root=tmp_path)
+    now = time.time()
+    seg1 = tmp_path / "seg1.mp4"
+    seg1.write_text("data")
+    mgr.register_segment("cam1", seg1, start_ts=now - 500, duration=5.0)
+
+    from pathlib import Path
+    original_unlink = Path.unlink
+    
+    def mock_unlink(self, *args, **kwargs):
+        if str(self) == str(seg1):
+            raise OSError("Permission denied")
+        return original_unlink(self, *args, **kwargs)
+        
+    monkeypatch.setattr(Path, "unlink", mock_unlink)
+
+    pruned = mgr.prune_old_segments(max_age_seconds=100)
+    assert pruned == 0
+    assert len(mgr._segments["cam1"]) == 1
+    assert mgr._segments["cam1"][0].segment_path == seg1

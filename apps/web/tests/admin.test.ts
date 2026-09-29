@@ -127,7 +127,10 @@ describe('Admin Operational Endpoints', () => {
 
     const req = new Request('http://localhost:3000/api/v1/trigger-contingency', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer admin-secret-dev'
+      },
       body: JSON.stringify({ fieldId: 'field-1', triggerSource: 'WEB_INTERFACE' }),
     });
 
@@ -136,6 +139,17 @@ describe('Admin Operational Endpoints', () => {
     const body = await response.json();
     expect(body.status).toBe('ACCEPTED');
     expect(body.event_id).toBe('evt-route-1');
+  });
+
+  it('rejects contingency trigger via Next.js POST route handler without auth', async () => {
+    const req = new Request('http://localhost:3000/api/v1/trigger-contingency', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fieldId: 'field-1', triggerSource: 'WEB_INTERFACE' }),
+    });
+
+    const response = await POST(req);
+    expect(response.status).toBe(401);
   });
 
   it('renders admin fields dashboard with camera health, capture profiles, and contingency trigger button', async () => {
