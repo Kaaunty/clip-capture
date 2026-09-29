@@ -1,5 +1,8 @@
+.superpowers
 .superpowers/
+.worktrees
 .worktrees/
+worktrees
 worktrees/
 node_modules/
 .next/
