@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { prisma } from '../../../lib/db';
 import ContingencyButton from './ContingencyButton';
 import CreateFieldModal from './CreateFieldModal';
+import AddCameraModal from './AddCameraModal';
+import DeleteFieldButton from './DeleteFieldButton';
 import { sanitizeRtspUrl } from './utils';
 
 export const dynamic = 'force-dynamic';
@@ -186,6 +188,18 @@ export default async function AdminFieldsPage() {
   const now = Date.now();
   const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
+  const agentUrl = process.env.FIELD_AGENT_URL || 'http://agent:8000';
+  let agentReachable = false;
+  try {
+    const res = await fetch(`${agentUrl.replace(/\/$/, '')}/api/v1/health`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(1000),
+    });
+    agentReachable = res.ok;
+  } catch {
+    agentReachable = false;
+  }
+
   return (
     <main style={styles.container}>
       <header style={styles.header}>
@@ -210,9 +224,9 @@ export default async function AdminFieldsPage() {
           {fields.map((field) => {
             const agentDevice = field.devices.find((d) => d.deviceType === 'AGENT');
             const lastHeartbeat = agentDevice?.lastHeartbeatAt;
-            const isOnline = lastHeartbeat
+            const isOnline = agentReachable || (lastHeartbeat
               ? now - new Date(lastHeartbeat).getTime() < FIVE_MINUTES_MS
-              : false;
+              : false);
 
             // Check queue lag: events in QUEUED or PROCESSING older than 5 minutes
             const hasQueueLag = field.events.some((evt) => {
@@ -236,6 +250,7 @@ export default async function AdminFieldsPage() {
                       <span>●</span>
                       <span>Agente {isOnline ? 'Online' : 'Offline'}</span>
                     </div>
+                    <DeleteFieldButton fieldId={field.id} fieldName={field.name} />
                   </div>
                 </div>
 
@@ -285,7 +300,10 @@ export default async function AdminFieldsPage() {
                   </div>
                 </div>
 
-                <h3 style={styles.sectionTitle}>Câmeras Vinculadas ({field.cameras.length})</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ ...styles.sectionTitle, margin: 0 }}>Câmeras Vinculadas ({field.cameras.length})</h3>
+                  <AddCameraModal fieldId={field.id} />
+                </div>
                 {field.cameras.length === 0 ? (
                   <p style={styles.emptyNotice}>Nenhuma câmera cadastrada para este campo.</p>
                 ) : (

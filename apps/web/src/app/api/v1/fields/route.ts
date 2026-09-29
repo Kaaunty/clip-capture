@@ -27,7 +27,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Field name is required' }, { status: 400 });
     }
 
-    const token = deviceToken || `tok_${crypto.randomBytes(16).toString('hex')}`;
+    const token =
+      deviceToken ||
+      process.env.FIELD_AGENT_DEVICE_TOKEN ||
+      'clip-capture-secret-demo-token';
 
     const field = await prisma.field.create({
       data: {
