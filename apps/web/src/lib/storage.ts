@@ -240,6 +240,9 @@ export class StorageService {
       : `${this.bucket}.s3.${this.region}.amazonaws.com`;
     const cleanKey = key.startsWith('/') ? key.slice(1) : key;
     const encodedKey = encodeURIComponent(cleanKey).replace(/%2F/g, '/');
+    const canonicalUri = this.endpoint
+      ? `/${this.bucket}/${encodedKey}`
+      : `/${encodedKey}`;
     const endpointUrl = this.endpoint
       ? `${this.endpoint.replace(/\/$/, '')}/${this.bucket}/${encodedKey}`
       : `https://${host}/${encodedKey}`;
@@ -265,7 +268,7 @@ export class StorageService {
     const canonicalHeaders = `host:${host}\n`;
     const canonicalRequest = [
       method,
-      `/${encodedKey}`,
+      canonicalUri,
       canonicalQuery,
       canonicalHeaders,
       'host',

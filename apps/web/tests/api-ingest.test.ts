@@ -13,6 +13,8 @@ import { POST as postConfirm } from '../src/app/api/v1/clips/confirm/route';
 
 describe('Agent Ingest API', () => {
   beforeEach(async () => {
+    storageService.resetMock();
+
     // Clean up database in reverse dependency order
     await prisma.shareToken.deleteMany();
     await prisma.clipFile.deleteMany();
@@ -64,7 +66,7 @@ describe('Agent Ingest API', () => {
     expect(res.status).toBe(401);
   });
 
-  it('validates checksum and stores clip file', async () => {
+  it('validates checksum and stores clip file as READY', async () => {
     const data = Buffer.from('fake-mp4-stream');
     const validChecksum = crypto.createHash('sha256').update(data).digest('hex');
 
@@ -81,12 +83,12 @@ describe('Agent Ingest API', () => {
     expect(res.status).toBe(200);
     expect(res.data.status).toBe('CONFIRMED');
 
-    // Verify clip file in database has uploadStatus COMPLETED
+    // Verify clip file in database has uploadStatus READY
     const clip = await prisma.clipFile.findFirst({
       where: { eventId: 'evt-1', cameraId: 'cam-1' },
     });
     expect(clip).toBeDefined();
-    expect(clip?.uploadStatus).toBe('COMPLETED');
+    expect(clip?.uploadStatus).toBe('READY');
     expect(clip?.sha256).toBe(validChecksum);
   });
 
@@ -121,7 +123,23 @@ describe('Agent Ingest API', () => {
     expect(res.data.event.status).toBe('PROCESSING');
   });
 
-  it('confirms clip upload with valid token and marks ClipFile as COMPLETED', async () => {
+  it('rejects cross-tenant event creation when fieldId does not match device', async () => {
+    const res = await handleCreateEvent({
+      headers: { authorization: 'Bearer test-device-token' },
+      body: {
+        fieldId: 'foreign-field-id',
+        commandId: 'cmd-cross-tenant',
+      },
+    });
+
+    expect(res.status).toBe(403);
+    expect(res.data.error).toContain('Forbidden');
+  });
+
+  it('confirms clip upload with valid token and marks ClipFile as READY', async () => {
+    // Upload object to storage first to simulate client presigned PUT
+    await storageService.uploadObject('clips/evt-1/cam-1_clip-1.mp4', Buffer.from('presigned-clip-bytes'));
+
     const res = await handleConfirmClip({
       headers: { authorization: 'Bearer test-device-token' },
       body: {
@@ -139,8 +157,48 @@ describe('Agent Ingest API', () => {
       where: { eventId: 'evt-1', cameraId: 'cam-1' },
     });
     expect(clip).toBeDefined();
-    expect(clip?.uploadStatus).toBe('COMPLETED');
+    expect(clip?.uploadStatus).toBe('READY');
     expect(clip?.sha256).toBe('hash-presigned-123');
+  });
+
+  it('rejects confirmation if file does not exist in storage', async () => {
+    const res = await handleConfirmClip({
+      headers: { authorization: 'Bearer test-device-token' },
+      body: {
+        eventId: 'evt-1',
+        cameraId: 'cam-1',
+        clipId: 'missing-clip',
+        checksum: 'hash-missing',
+      },
+    });
+
+    expect(res.status).toBe(404);
+    expect(res.data.error).toContain('not found in storage');
+  });
+
+  it('rejects cross-tenant clip confirmation for foreign event', async () => {
+    // Create foreign field and event
+    const otherField = await prisma.field.create({
+      data: { name: 'Foreign Field' },
+    });
+    const otherEvent = await prisma.clipEvent.create({
+      data: {
+        id: 'foreign-evt',
+        fieldId: otherField.id,
+        commandId: 'cmd-foreign',
+      },
+    });
+
+    const res = await handleConfirmClip({
+      headers: { authorization: 'Bearer test-device-token' },
+      body: {
+        eventId: otherEvent.id,
+        cameraId: 'cam-1',
+        checksum: 'hash',
+      },
+    });
+
+    expect(res.status).toBe(403);
   });
 });
 
@@ -191,6 +249,8 @@ describe('HTTP Route Handlers', () => {
   });
 
   it('handles JSON confirmation via POST /api/v1/clips/confirm', async () => {
+    await storageService.uploadObject('clips/evt-1/cam-1_clip.mp4', Buffer.from('confirmed-bytes'));
+
     const req = new Request('http://localhost:3000/api/v1/clips/confirm', {
       method: 'POST',
       headers: {
@@ -225,5 +285,20 @@ describe('StorageService', () => {
 
     const getUrl = await service.getPresignedGetUrl('test/path.mp4', 3600);
     expect(getUrl).toContain('test/path.mp4');
+  });
+
+  it('correctly formats presigned URL path for custom endpoint (path-style MinIO)', async () => {
+    const service = new StorageService({
+      mock: false,
+      bucket: 'custom-bucket',
+      endpoint: 'http://minio:9000',
+      region: 'us-east-1',
+      accessKeyId: 'MINIO_KEY',
+      secretAccessKey: 'MINIO_SECRET',
+    });
+
+    const putUrl = await service.getPresignedPutUrl('clips/test.mp4', 3600);
+    expect(putUrl).toContain('http://minio:9000/custom-bucket/clips/test.mp4');
+    expect(putUrl).toContain('X-Amz-Signature');
   });
 });

@@ -120,7 +120,13 @@ export async function handleCreateEvent(req: any): Promise<HandlerResponse> {
     };
   }
 
-  const fieldId = body.fieldId || auth.device.fieldId;
+  if (body.fieldId && body.fieldId !== auth.device.fieldId) {
+    return {
+      status: 403,
+      data: { error: 'Forbidden: device cannot register events for a different field' },
+    };
+  }
+  const fieldId = auth.device.fieldId;
   const commandId =
     body.commandId ||
     body.eventId ||
@@ -234,6 +240,15 @@ export async function handleUploadClip(req: any): Promise<HandlerResponse> {
       where: { commandId: eventId },
     });
   }
+
+  // Cross-tenant check if event exists
+  if (clipEvent && clipEvent.fieldId !== auth.device.fieldId) {
+    return {
+      status: 403,
+      data: { error: 'Forbidden: device cannot upload clips for a different field' },
+    };
+  }
+
   if (!clipEvent) {
     clipEvent = await prisma.clipEvent.create({
       data: {
@@ -273,7 +288,7 @@ export async function handleUploadClip(req: any): Promise<HandlerResponse> {
         storagePath,
         duration,
         sha256: computed,
-        uploadStatus: 'COMPLETED',
+        uploadStatus: 'READY',
       },
     });
   } else {
@@ -284,7 +299,7 @@ export async function handleUploadClip(req: any): Promise<HandlerResponse> {
         storagePath,
         duration,
         sha256: computed,
-        uploadStatus: 'COMPLETED',
+        uploadStatus: 'READY',
       },
     });
   }
@@ -338,6 +353,15 @@ export async function handleConfirmClip(req: any): Promise<HandlerResponse> {
       where: { commandId: eventId },
     });
   }
+
+  // Cross-tenant check if event exists
+  if (clipEvent && clipEvent.fieldId !== auth.device.fieldId) {
+    return {
+      status: 403,
+      data: { error: 'Forbidden: device cannot confirm clips for a different field' },
+    };
+  }
+
   if (!clipEvent) {
     clipEvent = await prisma.clipEvent.create({
       data: {
@@ -368,15 +392,26 @@ export async function handleConfirmClip(req: any): Promise<HandlerResponse> {
     where: { eventId: clipEvent.id, cameraId: camera.id },
   });
 
+  const finalStoragePath = existingClip?.storagePath || storagePath;
+
+  // Verify file exists in storage before confirming
+  const existsInStorage = await storageService.hasObject(finalStoragePath);
+  if (!existsInStorage) {
+    return {
+      status: 404,
+      data: { error: `Clip not found in storage at path: ${finalStoragePath}` },
+    };
+  }
+
   let clipFile;
   if (existingClip) {
     clipFile = await prisma.clipFile.update({
       where: { id: existingClip.id },
       data: {
-        storagePath: existingClip.storagePath || storagePath,
+        storagePath: finalStoragePath,
         duration: duration || existingClip.duration,
         sha256: checksum || existingClip.sha256,
-        uploadStatus: 'COMPLETED',
+        uploadStatus: 'READY',
       },
     });
   } else {
@@ -384,10 +419,10 @@ export async function handleConfirmClip(req: any): Promise<HandlerResponse> {
       data: {
         eventId: clipEvent.id,
         cameraId: camera.id,
-        storagePath,
+        storagePath: finalStoragePath,
         duration,
         sha256: checksum,
-        uploadStatus: 'COMPLETED',
+        uploadStatus: 'READY',
       },
     });
   }
