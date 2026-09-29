@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from apps.agent.src.models import AgentConfig
+from apps.agent.src.models import AgentConfig, CameraConfig, CaptureProfileConfig
+
+__all__ = ["load_agent_config", "AgentConfig", "CameraConfig", "CaptureProfileConfig"]
 
 
 def load_agent_config(data: dict[str, Any] | str | Path) -> AgentConfig:
