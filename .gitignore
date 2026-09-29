@@ -1,0 +1,14 @@
+.superpowers/
+.worktrees/
+worktrees/
+node_modules/
+.next/
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+*.db
+*.mp4
+*.ts
+*.m3u8
