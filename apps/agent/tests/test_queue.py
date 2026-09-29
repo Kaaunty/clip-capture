@@ -152,3 +152,92 @@ def test_queue_clip_lifecycle_transitions(tmp_path):
     # Verify no pending uploads remain
     assert len(q.get_pending_clips()) == 0
     assert len(q.get_pending_uploads()) == 0
+
+
+def test_schedule_extraction_with_extracted_status(tmp_path):
+    from unittest.mock import MagicMock
+    from apps.agent.src.config import AgentConfig, CameraConfig, CaptureProfileConfig
+    from apps.agent.src.models import ClipExtractionResult
+    from apps.agent.src.extractor import ClipExtractor
+
+    db_file = tmp_path / "queue.db"
+    db = LocalQueueDB(db_path=db_file)
+    clip_file = tmp_path / "cam1_clip.mp4"
+    clip_file.write_bytes(b"dummy-video-data")
+
+    config = AgentConfig(
+        field_id="f1",
+        central_api_url="https://api.test",
+        device_token="valid-token",
+        buffer_dir=str(tmp_path / "buf"),
+        storage_limit_mb=1000,
+        default_profile=CaptureProfileConfig(seconds_before=10, seconds_after=5),
+        cameras=[CameraConfig(id="cam1", name="Angle 1", rtsp_url="rtsp://test/1")],
+    )
+
+    mock_extractor = MagicMock(spec=ClipExtractor)
+    mock_extractor.extract_event_clips.return_value = [
+        ClipExtractionResult(
+            camera_id="cam1",
+            status="EXTRACTED",
+            output_path=clip_file,
+            duration=15.0,
+        )
+    ]
+
+    q = EventQueueManager(db=db, config=config, extractor=mock_extractor)
+    evt_id = q.enqueue_trigger(
+        command_id="cmd-extract",
+        field_id="f1",
+        trigger_source="PHYSICAL_BUTTON",
+        trigger_ts=time.time(),
+    )
+    assert q.get_event(evt_id)["status"] == "QUEUED"
+
+    jobs = q.schedule_extraction(event_id=evt_id, trigger_ts=time.time())
+    assert len(jobs) == 1
+    assert jobs[0].event_id == evt_id
+    assert jobs[0].camera_id == "cam1"
+    assert jobs[0].status == "EXTRACTED"
+    assert jobs[0].file_path == str(clip_file)
+
+    # Event status should have transitioned to EXTRACTED
+    evt_record = q.get_event(evt_id)
+    assert evt_record["status"] == "EXTRACTED"
+
+
+def test_schedule_extraction_handles_unexpected_exception(tmp_path):
+    from unittest.mock import MagicMock
+    from apps.agent.src.config import AgentConfig, CameraConfig, CaptureProfileConfig
+    from apps.agent.src.extractor import ClipExtractor
+
+    db_file = tmp_path / "queue.db"
+    db = LocalQueueDB(db_path=db_file)
+
+    config = AgentConfig(
+        field_id="f1",
+        central_api_url="https://api.test",
+        device_token="valid-token",
+        buffer_dir=str(tmp_path / "buf"),
+        storage_limit_mb=1000,
+        default_profile=CaptureProfileConfig(seconds_before=10, seconds_after=5),
+        cameras=[CameraConfig(id="cam1", name="Angle 1", rtsp_url="rtsp://test/1")],
+    )
+
+    mock_extractor = MagicMock(spec=ClipExtractor)
+    mock_extractor.extract_event_clips.side_effect = RuntimeError("Extraction crashed")
+
+    q = EventQueueManager(db=db, config=config, extractor=mock_extractor)
+    evt_id = q.enqueue_trigger(
+        command_id="cmd-crash",
+        field_id="f1",
+        trigger_source="PHYSICAL_BUTTON",
+        trigger_ts=time.time(),
+    )
+
+    jobs = q.schedule_extraction(event_id=evt_id, trigger_ts=time.time())
+    assert jobs == []
+
+    # Event status should be marked FAILED on unexpected crash
+    evt_record = q.get_event(evt_id)
+    assert evt_record["status"] == "FAILED"

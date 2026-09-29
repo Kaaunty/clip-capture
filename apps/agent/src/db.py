@@ -13,14 +13,14 @@ class LocalQueueDB:
     def __init__(self, db_path: Path | str = ":memory:"):
         self.db_path = str(db_path)
         self._lock = threading.Lock()
-        
+
         # Ensure parent directory exists if using a file path
         if self.db_path != ":memory:":
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-            
+
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
-        
+
         # Enable WAL and foreign keys
         with self._lock:
             with self.conn:
@@ -257,25 +257,20 @@ class LocalQueueDB:
     def is_recent_button_trigger(
         self, field_id: str, trigger_ts: float, window_seconds: float = 3.0
     ) -> bool:
-        """Check if a button press on the same field occurred within window_seconds."""
+        """Check if a button press on the same field occurred within window_seconds using range check."""
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute(
                 """
-                SELECT trigger_ts, received_at FROM recent_commands
-                WHERE field_id = ? AND UPPER(trigger_source) LIKE '%BUTTON%'
-                ORDER BY trigger_ts DESC LIMIT 1
+                SELECT 1 FROM recent_commands
+                WHERE field_id = ?
+                  AND UPPER(trigger_source) LIKE '%BUTTON%'
+                  AND trigger_ts BETWEEN (? - ?) AND (? + ?)
+                LIMIT 1
                 """,
-                (field_id,),
+                (field_id, trigger_ts, window_seconds, trigger_ts, window_seconds),
             )
-            row = cursor.fetchone()
-            if not row:
-                return False
-
-            prev_ts = float(row["trigger_ts"])
-            if abs(trigger_ts - prev_ts) < window_seconds:
-                return True
-            return False
+            return cursor.fetchone() is not None
 
     def check_duplicate(
         self,
@@ -284,16 +279,52 @@ class LocalQueueDB:
         trigger_source: str,
         trigger_ts: float,
         window_seconds: float = 3.0,
-    ) -> tuple[bool, str | None]:
-        """Check both command_id uniqueness and button debounce."""
-        if self.is_duplicate_command(command_id):
-            return True, f"Command {command_id} already processed"
+    ) -> tuple[bool, str | None, str | None]:
+        """Check both command_id uniqueness and button debounce with window range check.
 
-        if "BUTTON" in trigger_source.upper():
-            if self.is_recent_button_trigger(field_id, trigger_ts, window_seconds):
-                return True, f"Button trigger debounced within {window_seconds}s"
+        Returns (is_duplicate, reason, existing_event_id).
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            # 1. Check recent_commands by command_id
+            cursor.execute(
+                "SELECT event_id FROM recent_commands WHERE command_id = ?",
+                (command_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return True, f"Command {command_id} already processed", row["event_id"]
 
-        return False, None
+            # 2. Check events table by command_id
+            cursor.execute(
+                "SELECT event_id FROM events WHERE command_id = ?",
+                (command_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return True, f"Command {command_id} already processed", row["event_id"]
+
+            # 3. Check button debounce window range
+            if "BUTTON" in trigger_source.upper():
+                cursor.execute(
+                    """
+                    SELECT event_id FROM recent_commands
+                    WHERE field_id = ?
+                      AND UPPER(trigger_source) LIKE '%BUTTON%'
+                      AND trigger_ts BETWEEN (? - ?) AND (? + ?)
+                    ORDER BY trigger_ts DESC LIMIT 1
+                    """,
+                    (field_id, trigger_ts, window_seconds, trigger_ts, window_seconds),
+                )
+                btn_row = cursor.fetchone()
+                if btn_row:
+                    return (
+                        True,
+                        f"Button trigger debounced within {window_seconds}s",
+                        btn_row["event_id"],
+                    )
+
+        return False, None, None
 
     def close(self) -> None:
         """Close SQLite connection."""

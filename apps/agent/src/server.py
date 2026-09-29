@@ -1,6 +1,7 @@
 """FastAPI HTTP service for local event ingestion and health monitoring."""
 
 from pathlib import Path
+import secrets
 import time
 from typing import Annotated
 
@@ -42,14 +43,14 @@ def create_agent_app(
         background_tasks: BackgroundTasks,
         authorization: Annotated[str | None, Header()] = None,
     ):
-        # 1. Bearer Token Authentication
+        # 1. Bearer Token Authentication using constant-time comparison
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Missing or malformed Authorization header",
             )
         token = authorization.removeprefix("Bearer ").strip()
-        if token != config.device_token:
+        if not secrets.compare_digest(token, config.device_token):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid device authentication token",
@@ -58,23 +59,7 @@ def create_agent_app(
         field_id = payload.field_id or config.field_id
         trigger_ts = payload.timestamp if payload.timestamp is not None else time.time()
 
-        # 2. Idempotency and debounce check
-        if queue_mgr.is_duplicate(
-            command_id=payload.command_id,
-            field_id=field_id,
-            trigger_source=payload.trigger_source,
-            trigger_ts=trigger_ts,
-        ):
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={
-                    "status": "DUPLICATE_IGNORED",
-                    "command_id": payload.command_id,
-                    "message": "Duplicate trigger ignored (duplicate command_id or button debounce window)",
-                },
-            )
-
-        # 3. Ingestion into persistent queue
+        # 2. Ingestion into persistent queue with duplicate / debounce check
         try:
             event_id = queue_mgr.enqueue_trigger(
                 command_id=payload.command_id,
@@ -93,7 +78,7 @@ def create_agent_app(
                 },
             )
 
-        # 4. Schedule extraction if extractor configured with active cameras
+        # 3. Schedule extraction if extractor configured with active cameras
         if extractor is not None and config.cameras:
             background_tasks.add_task(queue_mgr.schedule_extraction, event_id, trigger_ts)
 

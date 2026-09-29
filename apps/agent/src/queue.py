@@ -61,7 +61,7 @@ class EventQueueManager:
         window_seconds: float = 3.0,
     ) -> bool:
         """Check whether a trigger matches a recent command_id or button press."""
-        is_dup, _ = self.db.check_duplicate(
+        is_dup, _, _ = self.db.check_duplicate(
             command_id=command_id,
             field_id=field_id,
             trigger_source=trigger_source,
@@ -79,11 +79,11 @@ class EventQueueManager:
         window_seconds: float = 3.0,
     ) -> str:
         """Validate and enqueue a new trigger command.
-        
+
         Raises DuplicateTriggerError if command is duplicate or within debounce window.
         Returns event_id.
         """
-        is_dup, reason = self.db.check_duplicate(
+        is_dup, reason, existing_id = self.db.check_duplicate(
             command_id=command_id,
             field_id=field_id,
             trigger_source=trigger_source,
@@ -91,8 +91,6 @@ class EventQueueManager:
             window_seconds=window_seconds,
         )
         if is_dup:
-            existing_event = self.db.get_event_by_command_id(command_id)
-            existing_id = existing_event["event_id"] if existing_event else None
             raise DuplicateTriggerError(
                 message=reason or "Duplicate trigger rejected",
                 existing_event_id=existing_id,
@@ -203,16 +201,22 @@ class EventQueueManager:
 
         self.db.update_event_status(event_id, "PROCESSING")
         profile = self.config.default_profile
-        results = self.extractor.extract_event_clips(
-            event_id=event_id,
-            trigger_ts=trigger_ts,
-            profile=profile,
-            cameras=self.config.cameras,
-        )
+
+        try:
+            results = self.extractor.extract_event_clips(
+                event_id=event_id,
+                trigger_ts=trigger_ts,
+                profile=profile,
+                cameras=self.config.cameras,
+            )
+        except Exception as e:
+            logger.exception("Clip extraction failed unexpectedly for event %s: %s", event_id, e)
+            self.db.update_event_status(event_id, "FAILED")
+            return []
 
         jobs: list[ClipJob] = []
         for r in results:
-            if r.status == "SUCCESS" and r.output_path:
+            if r.status in ("EXTRACTED", "SUCCESS") and r.output_path:
                 job = self.add_clip_to_event(
                     event_id=event_id,
                     camera_id=r.camera_id,

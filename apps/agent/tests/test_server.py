@@ -30,11 +30,13 @@ def test_duplicate_trigger_rejection(tmp_path):
     assert res1.status_code == 200
     assert res1.json()["status"] == "ACCEPTED"
     assert "event_id" in res1.json()
+    evt_id = res1.json()["event_id"]
 
     # Immediate second call with same command_id is idempotent / deduplicated
     res2 = client.post("/api/v1/trigger", json=payload, headers=headers)
     assert res2.status_code == 200
     assert res2.json()["status"] == "DUPLICATE_IGNORED"
+    assert res2.json()["event_id"] == evt_id
 
 
 def test_button_double_click_within_3s(tmp_path):
@@ -50,12 +52,14 @@ def test_button_double_click_within_3s(tmp_path):
     r1 = client.post("/api/v1/trigger", json=p1, headers=headers)
     assert r1.status_code == 200
     assert r1.json()["status"] == "ACCEPTED"
+    evt1 = r1.json()["event_id"]
 
     # Rapid button click 2 with different command_id 1.5s later -> duplicate debounce
     p2 = {"command_id": "cmd-2", "trigger_source": "PHYSICAL_BUTTON", "timestamp": base_time + 1.5}
     r2 = client.post("/api/v1/trigger", json=p2, headers=headers)
     assert r2.status_code == 200
     assert r2.json()["status"] == "DUPLICATE_IGNORED"
+    assert r2.json()["event_id"] == evt1
 
 
 def test_button_click_after_3s_accepted(tmp_path):
