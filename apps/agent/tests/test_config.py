@@ -41,6 +41,20 @@ def test_trigger_command_payload_model():
     assert payload.trigger_source == "PHYSICAL_BUTTON"
 
 
+def test_load_agent_config_file_not_found(tmp_path):
+    missing_file = tmp_path / "non_existent_config.json"
+    with pytest.raises(FileNotFoundError, match="Config file not found"):
+        load_agent_config(missing_file)
+
+
+def test_trigger_command_payload_invalid_source():
+    with pytest.raises(ValidationError):
+        TriggerCommandPayload(
+            command_id="cmd-123",
+            trigger_source="INVALID_SOURCE",  # type: ignore
+        )
+
+
 def test_clip_metadata_model():
     meta = ClipMetadata(
         clip_id="clip-1",

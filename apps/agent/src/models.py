@@ -39,7 +39,7 @@ class TriggerCommandPayload(BaseModel):
     """Payload received when a clip capture event is triggered."""
 
     command_id: str
-    trigger_source: str = "PHYSICAL_BUTTON"
+    trigger_source: Literal["PHYSICAL_BUTTON", "WEB_INTERFACE", "API"] = "PHYSICAL_BUTTON"
     timestamp: float | None = None
     field_id: str | None = None
 

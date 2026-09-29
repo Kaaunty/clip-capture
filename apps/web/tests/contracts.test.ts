@@ -31,6 +31,16 @@ describe('Contracts Validation', () => {
     expect(validateClipEventPayload(payload)).toBe(false);
   });
 
+  it('rejects invalid Date object in triggeredAt', () => {
+    const payload = {
+      fieldId: 'field-1',
+      triggeredAt: new Date('invalid-date-string'),
+      commandId: 'cmd-123',
+      triggerSource: 'PHYSICAL_BUTTON' as const,
+    };
+    expect(validateClipEventPayload(payload)).toBe(false);
+  });
+
   it('rejects null or non-object payloads', () => {
     expect(validateClipEventPayload(null)).toBe(false);
     expect(validateClipEventPayload(undefined)).toBe(false);

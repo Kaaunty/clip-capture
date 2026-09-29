@@ -130,5 +130,9 @@ export function validateClipEventPayload(payload: unknown): payload is ClipEvent
     }
   }
 
+  if (p.triggeredAt instanceof Date && isNaN(p.triggeredAt.getTime())) {
+    return false;
+  }
+
   return true;
 }
