@@ -53,6 +53,9 @@ describe('ShareEventView', () => {
         { id: '1', cameraName: 'Gol Norte', status: 'READY', videoUrl: 'https://s3/c1.mp4' },
       ],
     };
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', props.shareUrl);
+    }
     render(<ShareEventView {...props} />);
     const waButton = screen.getByText('Compartilhar no WhatsApp');
     expect(waButton).toBeDefined();

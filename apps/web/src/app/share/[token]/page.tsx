@@ -4,7 +4,7 @@ import { storageService } from '../../../lib/storage';
 import ShareEventView, { AngleViewItem } from './ShareEventView';
 
 interface PageProps {
-  params: Promise<{ token: string }> | { token: string };
+  params: Promise<{ token: string }>;
 }
 
 export default async function SharePage({ params }: PageProps) {
@@ -30,6 +30,7 @@ export default async function SharePage({ params }: PageProps) {
   const eventDate = new Date(event.triggeredAt || event.createdAt);
   const formattedDate = !isNaN(eventDate.getTime())
     ? eventDate.toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',

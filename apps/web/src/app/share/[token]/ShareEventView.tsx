@@ -120,7 +120,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   anglesGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
     gap: '20px',
   },
   angleCard: {
@@ -246,7 +246,9 @@ export default function ShareEventView({
   }
 
   const currentUrl =
-    shareUrl || (typeof window !== 'undefined' ? window.location.href : '');
+    typeof window !== 'undefined' && window.location.href
+      ? window.location.href
+      : shareUrl || '';
   const encodedShareText = encodeURIComponent(
     `Confira o lance ${eventName ? `"${eventName}"` : ''}${fieldName ? ` no ${fieldName}` : ''}: ${currentUrl}`,
   );
