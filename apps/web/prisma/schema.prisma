@@ -1,0 +1,107 @@
+// Prisma schema for Clip Capture Central Web/API
+// Matches Section 6 (Logical Model) of the design specification.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Field {
+  id             String          @id @default(cuid())
+  name           String
+  status         String          @default("ACTIVE")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  cameras        Camera[]
+  profile        CaptureProfile?
+  events         ClipEvent[]
+  devices        Device[]
+}
+
+model Camera {
+  id           String     @id @default(cuid())
+  fieldId      String
+  name         String
+  rtspUrl      String
+  displayOrder Int        @default(0)
+  status       String     @default("ACTIVE")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  field        Field      @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  files        ClipFile[]
+}
+
+model CaptureProfile {
+  id            String   @id @default(cuid())
+  fieldId       String   @unique
+  secondsBefore Int      @default(15)
+  secondsAfter  Int      @default(10)
+  retentionDays Int      @default(7)
+  format        String   @default("MP4")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  field         Field    @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+}
+
+model ClipEvent {
+  id            String       @id @default(cuid())
+  fieldId       String
+  commandId     String       @unique
+  triggerSource String       @default("PHYSICAL_BUTTON")
+  status        String       @default("QUEUED")
+  triggeredAt   DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  field         Field        @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  files         ClipFile[]
+  tokens        ShareToken[]
+}
+
+model ClipFile {
+  id           String    @id @default(cuid())
+  eventId      String
+  cameraId     String
+  storagePath  String
+  duration     Float
+  sha256       String?
+  uploadStatus String    @default("PENDING")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  event        ClipEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  camera       Camera    @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+}
+
+model ShareToken {
+  id          String    @id @default(cuid())
+  eventId     String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  scope       String?   @default("PUBLIC")
+  accessCount Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  event       ClipEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model Device {
+  id              String    @id @default(cuid())
+  fieldId         String
+  deviceType      String    @default("AGENT")
+  identifier      String    @unique
+  secretToken     String
+  lastHeartbeatAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  field           Field     @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+}
