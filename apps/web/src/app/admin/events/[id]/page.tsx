@@ -186,11 +186,11 @@ export default async function AdminEventPage({ params }: PageProps) {
     );
   }
 
-  // Find latest active share token if any
-  const latestToken = event.tokens.length > 0 ? event.tokens[0].tokenHash : null;
-
   // Build camera angles
   const fieldCameras = event.field?.cameras || [];
+  const isProcessing = event.status === 'PROCESSING' || event.status === 'QUEUED';
+  const defaultMissingStatus = isProcessing ? 'PENDING' : 'CAMERA_UNAVAILABLE';
+
   const angles: Array<{
     id: string;
     cameraName: string;
@@ -208,7 +208,7 @@ export default async function AdminEventPage({ params }: PageProps) {
         id: cam.id,
         cameraName: cam.name,
         fileId: file?.id,
-        uploadStatus: file?.uploadStatus || 'CAMERA_UNAVAILABLE',
+        uploadStatus: file?.uploadStatus || defaultMissingStatus,
         duration: file?.duration,
         storagePath: file?.storagePath,
         sha256: file?.sha256,
@@ -339,7 +339,7 @@ export default async function AdminEventPage({ params }: PageProps) {
           <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 12px 0' }}>
             Gere um link temporário com token seguro para visualização externa dos vídeos prontos.
           </p>
-          <ShareActions eventId={event.id} initialToken={latestToken} />
+          <ShareActions eventId={event.id} initialShareUrl={undefined} />
         </div>
       </section>
     </main>

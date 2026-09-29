@@ -2,6 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { prisma } from '../../../lib/db';
 import ContingencyButton from './ContingencyButton';
+import { sanitizeRtspUrl } from './utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -262,6 +263,7 @@ export default async function AdminFieldsPage() {
                     <span style={styles.metaValue}>
                       {lastHeartbeat
                         ? new Date(lastHeartbeat).toLocaleTimeString('pt-BR', {
+                            timeZone: 'America/Sao_Paulo',
                             hour: '2-digit',
                             minute: '2-digit',
                             second: '2-digit',
@@ -315,7 +317,7 @@ export default async function AdminFieldsPage() {
                           </td>
                           <td style={styles.td}>
                             <code style={{ fontSize: '12px', color: '#64748b' }}>
-                              {cam.rtspUrl}
+                              {sanitizeRtspUrl(cam.rtspUrl)}
                             </code>
                           </td>
                         </tr>
@@ -343,6 +345,7 @@ export default async function AdminFieldsPage() {
                         <tr key={evt.id}>
                           <td style={styles.td}>
                             {new Date(evt.triggeredAt || evt.createdAt).toLocaleTimeString('pt-BR', {
+                              timeZone: 'America/Sao_Paulo',
                               hour: '2-digit',
                               minute: '2-digit',
                               second: '2-digit',

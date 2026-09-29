@@ -1,11 +1,15 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterAll, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { prisma } from '../src/lib/db';
-import { handleContingencyTrigger, POST } from '../src/app/api/v1/trigger-contingency/route';
+import { handleContingencyTrigger } from '../src/app/api/v1/trigger-contingency/handlers';
+import { POST } from '../src/app/api/v1/trigger-contingency/route';
+import { POST as postRetry } from '../src/app/api/v1/events/[id]/retry/route';
 import AdminFieldsPage from '../src/app/admin/fields/page';
 import AdminEventPage from '../src/app/admin/events/[id]/page';
+import ShareActions from '../src/app/admin/events/[id]/ShareActions';
+import RetryButton from '../src/app/admin/events/[id]/RetryButton';
 
 afterEach(() => {
   cleanup();
@@ -77,6 +81,34 @@ describe('Admin Operational Endpoints', () => {
     expect(savedEvent?.status).toBe('QUEUED');
   });
 
+  it('supports custom commandId and deduplicates repeat triggers', async () => {
+    await prisma.field.create({
+      data: {
+        id: 'field-dedup-1',
+        name: 'Campo Dedup',
+      },
+    });
+
+    const mockFetch = vi.fn().mockRejectedValue(new Error('Agent offline'));
+    global.fetch = mockFetch;
+
+    // First trigger with specific commandId
+    const res1 = await handleContingencyTrigger({
+      fieldId: 'field-dedup-1',
+      commandId: 'custom-cmd-123',
+    });
+    expect(res1.status).toBe(200);
+    expect(res1.data.status).toBe('ACCEPTED');
+
+    // Duplicate trigger with same commandId
+    const res2 = await handleContingencyTrigger({
+      fieldId: 'field-dedup-1',
+      command_id: 'custom-cmd-123',
+    });
+    expect(res2.status).toBe(200);
+    expect(res2.data.status).toBe('DUPLICATE_IGNORED');
+  });
+
   it('validates required fieldId in contingency trigger', async () => {
     const res = await handleContingencyTrigger({
       fieldId: '',
@@ -123,7 +155,7 @@ describe('Admin Operational Endpoints', () => {
             {
               id: 'cam-1',
               name: 'Câmera Principal Norte',
-              rtspUrl: 'rtsp://cam1',
+              rtspUrl: 'rtsp://admin:supersecret@192.168.1.100/stream',
               displayOrder: 1,
               status: 'ACTIVE',
             },
@@ -148,6 +180,10 @@ describe('Admin Operational Endpoints', () => {
 
     expect(screen.getByText('Campo Sintético Alpha')).toBeDefined();
     expect(screen.getByText('Câmera Principal Norte')).toBeDefined();
+    // Verify RTSP password is NOT exposed in the DOM
+    expect(screen.queryByText(/supersecret/)).toBeNull();
+    expect(screen.getByText(/rtsp:\/\/\*\*\*:\*\*\*@192\.168\.1\.100\/stream/)).toBeDefined();
+
     expect(screen.getByText(/15s/)).toBeDefined();
     expect(screen.getByText(/10s/)).toBeDefined();
     expect(screen.getByText(/Online/i)).toBeDefined();
@@ -200,7 +236,7 @@ describe('Admin Operational Endpoints', () => {
         id: 'evt-view-1',
         fieldId: field.id,
         commandId: 'cmd-v1',
-        status: 'PROCESSING',
+        status: 'COMPLETED',
         triggerSource: 'PHYSICAL_BUTTON',
         files: {
           create: [
@@ -218,14 +254,6 @@ describe('Admin Operational Endpoints', () => {
             },
           ],
         },
-        tokens: {
-          create: [
-            {
-              tokenHash: 'token-hash-123',
-              expiresAt: new Date(Date.now() + 86400000),
-            },
-          ],
-        },
       },
     });
 
@@ -240,6 +268,151 @@ describe('Admin Operational Endpoints', () => {
     expect(screen.getByText('READY')).toBeDefined();
     expect(screen.getByText('CAMERA_UNAVAILABLE')).toBeDefined();
     expect(screen.getByText(/Gerar Link de Compartilhamento/i)).toBeDefined();
+  });
+
+  it('defaults missing files to PENDING when event status is PROCESSING', async () => {
+    const field = await prisma.field.create({
+      data: {
+        id: 'field-processing-1',
+        name: 'Campo Em Processamento',
+        cameras: {
+          create: [
+            { id: 'cam-p1', name: 'Câmera 1', rtspUrl: 'rtsp://cam1' },
+            { id: 'cam-p2', name: 'Câmera 2', rtspUrl: 'rtsp://cam2' },
+          ],
+        },
+      },
+    });
+
+    // Event is PROCESSING and only cam-p1 has a file so far
+    const event = await prisma.clipEvent.create({
+      data: {
+        id: 'evt-proc-1',
+        fieldId: field.id,
+        commandId: 'cmd-proc-1',
+        status: 'PROCESSING',
+        files: {
+          create: [
+            {
+              cameraId: 'cam-p1',
+              storagePath: 'clips/cam1.mp4',
+              duration: 25,
+              uploadStatus: 'READY',
+            },
+          ],
+        },
+      },
+    });
+
+    const pageElement = await AdminEventPage({
+      params: Promise.resolve({ id: event.id }),
+    });
+    render(pageElement);
+
+    expect(screen.getByText('READY')).toBeDefined();
+    expect(screen.getByText('PENDING')).toBeDefined();
+    expect(screen.queryByText('CAMERA_UNAVAILABLE')).toBeNull();
+  });
+
+  it('handles operational retry via POST /api/v1/events/[id]/retry', async () => {
+    const field = await prisma.field.create({
+      data: {
+        id: 'field-retry-1',
+        name: 'Campo Retry',
+        cameras: {
+          create: [{ id: 'cam-r1', name: 'Câmera Retry', rtspUrl: 'rtsp://cam1' }],
+        },
+      },
+    });
+
+    const event = await prisma.clipEvent.create({
+      data: {
+        id: 'evt-retry-1',
+        fieldId: field.id,
+        commandId: 'cmd-retry-1',
+        status: 'FAILED',
+        files: {
+          create: [
+            {
+              id: 'file-r1',
+              cameraId: 'cam-r1',
+              storagePath: 'clips/fail.mp4',
+              duration: 0,
+              uploadStatus: 'FAILED',
+            },
+          ],
+        },
+      },
+    });
+
+    const req = new Request('http://localhost:3000/api/v1/events/evt-retry-1/retry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileId: 'file-r1' }),
+    });
+
+    const res = await postRetry(req, {
+      params: Promise.resolve({ id: 'evt-retry-1' }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('ACCEPTED');
+
+    const updatedFile = await prisma.clipFile.findUnique({
+      where: { id: 'file-r1' },
+    });
+    expect(updatedFile?.uploadStatus).toBe('PENDING');
+
+    const updatedEvent = await prisma.clipEvent.findUnique({
+      where: { id: 'evt-retry-1' },
+    });
+    expect(updatedEvent?.status).toBe('PROCESSING');
+  });
+
+  it('ShareActions correctly parses rawToken and shareUrl from share endpoint', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        shareUrl: 'http://localhost:3000/share/token-raw-abc',
+        rawToken: 'token-raw-abc',
+      }),
+    });
+    global.fetch = mockFetch;
+
+    render(React.createElement(ShareActions, { eventId: 'evt-test-share' }));
+
+    const generateBtn = screen.getByText(/Gerar Link de Compartilhamento/i);
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Link gerado com sucesso!')).toBeDefined();
+      expect(screen.getByText(/token-raw-abc/)).toBeDefined();
+    });
+  });
+
+  it('RetryButton sends real POST request to retry endpoint and updates UI', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'ACCEPTED' }),
+    });
+    global.fetch = mockFetch;
+
+    render(React.createElement(RetryButton, { eventId: 'evt-123', cameraId: 'cam-1', fileId: 'file-1' }));
+
+    const retryBtn = screen.getByText('🔄 Retentar Upload');
+    fireEvent.click(retryBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('✓ Retentativa Agendada')).toBeDefined();
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/events/evt-123/retry',
+      expect.objectContaining({
+        method: 'POST',
+      })
+    );
   });
 
   it('renders 404 state when event is not found in admin view', async () => {

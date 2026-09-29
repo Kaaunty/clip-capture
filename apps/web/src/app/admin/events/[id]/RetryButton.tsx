@@ -13,13 +13,28 @@ export default function RetryButton({
 }) {
   const [retrying, setRetrying] = useState(false);
   const [retried, setRetried] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleRetry = async () => {
     setRetrying(true);
-    // Simulate / notify retry trigger
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    setRetrying(false);
-    setRetried(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/events/${eventId}/retry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId, cameraId }),
+      });
+      if (res.ok) {
+        setRetried(true);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Falha ao retentar');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Erro de rede');
+    } finally {
+      setRetrying(false);
+    }
   };
 
   return (
@@ -38,8 +53,13 @@ export default function RetryButton({
           cursor: retrying ? 'not-allowed' : 'pointer',
         }}
       >
-        {retrying ? 'Retentando...' : retried ? '✓ Solicitação Enviada' : '🔄 Retentar Upload'}
+        {retrying ? 'Retentando...' : retried ? '✓ Retentativa Agendada' : '🔄 Retentar Upload'}
       </button>
+      {error && (
+        <span style={{ color: '#dc2626', fontSize: '11px', display: 'block', marginTop: '2px' }}>
+          {error}
+        </span>
+      )}
     </div>
   );
 }

@@ -4,20 +4,13 @@ import React, { useState } from 'react';
 
 interface ShareActionsProps {
   eventId: string;
-  initialToken?: string | null;
+  initialShareUrl?: string | null;
 }
 
-export default function ShareActions({ eventId, initialToken }: ShareActionsProps) {
-  const [token, setToken] = useState<string | null>(initialToken || null);
+export default function ShareActions({ eventId, initialShareUrl }: ShareActionsProps) {
+  const [shareUrl, setShareUrl] = useState<string | null>(initialShareUrl || null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
-  const baseUrl =
-    typeof window !== 'undefined'
-      ? window.location.origin
-      : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-
-  const shareUrl = token ? `${baseUrl}/share/${token}` : null;
 
   const handleGenerateShareToken = async () => {
     setLoading(true);
@@ -28,8 +21,11 @@ export default function ShareActions({ eventId, initialToken }: ShareActionsProp
         headers: { 'Content-Type': 'application/json' },
       });
       const data = await res.json();
-      if (res.ok && data.token) {
-        setToken(data.token);
+      if (res.ok && (data.shareUrl || data.rawToken)) {
+        const url =
+          data.shareUrl ||
+          `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${data.rawToken}`;
+        setShareUrl(url);
         setMessage('Link gerado com sucesso!');
       } else {
         setMessage(data.error || 'Falha ao gerar link de compartilhamento.');
