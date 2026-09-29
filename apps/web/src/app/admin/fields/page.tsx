@@ -2,6 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { prisma } from '../../../lib/db';
 import ContingencyButton from './ContingencyButton';
+import CreateFieldModal from './CreateFieldModal';
 import { sanitizeRtspUrl } from './utils';
 
 export const dynamic = 'force-dynamic';
@@ -194,11 +195,15 @@ export default async function AdminFieldsPage() {
             Monitoramento de conectividade, perfis de captura e acionamento de contingência.
           </p>
         </div>
+        <CreateFieldModal />
       </header>
 
       {fields.length === 0 ? (
         <div style={styles.card}>
-          <p style={styles.emptyNotice}>Nenhum campo cadastrado no momento.</p>
+          <p style={{ ...styles.emptyNotice, marginBottom: '16px' }}>
+            Nenhum campo cadastrado no momento. Cadastre seu primeiro campo com as URLs RTSP reais para começar.
+          </p>
+          <CreateFieldModal />
         </div>
       ) : (
         <div style={styles.fieldGrid}>

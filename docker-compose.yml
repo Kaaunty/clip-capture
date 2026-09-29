@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     build:
@@ -11,13 +9,18 @@ services:
     environment:
       - PORT=3000
       - DATABASE_URL=file:/app/prisma/data/dev.db
-      - STORAGE_DRIVER=local
+      - SEED_DEMO_DATA=false
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-local}
       - STORAGE_DIR=/app/storage
+      - S3_BUCKET=${S3_BUCKET:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
       - FIELD_AGENT_URL=http://agent:8000
-      - FIELD_AGENT_DEVICE_TOKEN=clip-capture-secret-demo-token
-      - ADMIN_API_KEY=clip-capture-secret-demo-token
-      - APP_BASE_URL=http://localhost:3000
-      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - FIELD_AGENT_DEVICE_TOKEN=${DEVICE_TOKEN:-clip-capture-secret-demo-token}
+      - ADMIN_API_KEY=${DEVICE_TOKEN:-clip-capture-secret-demo-token}
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_APP_URL=${APP_BASE_URL:-http://localhost:3000}
     volumes:
       - web_db:/app/prisma/data
       - web_storage:/app/storage
@@ -31,13 +34,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - FIELD_ID=campo-1
+      - FIELD_ID=${FIELD_ID:-campo-1}
       - CENTRAL_API_URL=http://web:3000
-      - DEVICE_TOKEN=clip-capture-secret-demo-token
+      - DEVICE_TOKEN=${DEVICE_TOKEN:-clip-capture-secret-demo-token}
       - BUFFER_DIR=/app/buffer
       - DB_PATH=/app/data/queue.db
       - PORT=8000
-      - MOCK_CAMERA_FEED=true
+      - MOCK_CAMERA_FEED=false
+      - RTSP_CAM_1=${RTSP_CAM_1:-rtsp://camera1:554/stream1}
+      - RTSP_CAM_2=${RTSP_CAM_2:-rtsp://camera2:554/stream1}
+      - RTSP_CAM_3=${RTSP_CAM_3:-rtsp://camera3:554/stream1}
+      - CAMERAS_JSON=${CAMERAS_JSON:-}
     volumes:
       - agent_buffer:/app/buffer
       - agent_data:/app/data

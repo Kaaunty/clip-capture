@@ -2,6 +2,10 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.SEED_DEMO_DATA === 'false') {
+    console.log('SEED_DEMO_DATA is set to false. Skipping mock seed.');
+    return;
+  }
   console.log('Seeding initial database data...');
 
   const fieldId = 'campo-1';

@@ -1,5 +1,6 @@
 """Entrypoint to launch the Clip Capture Local Field Agent."""
 
+import json
 import logging
 import os
 from pathlib import Path
@@ -9,7 +10,7 @@ import time
 import uvicorn
 
 from apps.agent.src.buffer import CircularBufferManager
-from apps.agent.src.config import AgentConfig
+from apps.agent.src.config import AgentConfig, load_agent_config
 from apps.agent.src.db import LocalQueueDB
 from apps.agent.src.extractor import ClipExtractor
 from apps.agent.src.models import CameraConfig, CaptureProfileConfig
@@ -43,6 +44,7 @@ def run_synthetic_camera_feed(
             seg_file = cam_dir / f"seg_{seg_idx}_{cam.id}.mp4"
             cmd = [
                 "ffmpeg",
+                "-nostdin",
                 "-y",
                 "-f",
                 "lavfi",
@@ -72,6 +74,82 @@ def run_synthetic_camera_feed(
         stop_event.wait(timeout=2.8)
 
 
+def record_rtsp_stream(
+    cam: CameraConfig,
+    buffer_mgr: CircularBufferManager,
+    stop_event: threading.Event,
+):
+    """Continuously record segments from a real RTSP camera stream using FFmpeg."""
+    logger.info("Starting live RTSP recorder for camera %s (%s) -> %s", cam.id, cam.name, cam.rtsp_url)
+    cam_dir = buffer_mgr.get_camera_dir(cam.id)
+    known_segments: set[Path] = set()
+
+    while not stop_event.is_set():
+        if not cam.is_active:
+            time.sleep(2.0)
+            continue
+
+        seg_pattern = str(cam_dir / "seg_%05d.mp4")
+        cmd = [
+            "ffmpeg",
+            "-nostdin",
+            "-y",
+            "-rtsp_transport",
+            "tcp",
+            "-i",
+            cam.rtsp_url,
+            "-c",
+            "copy",
+            "-f",
+            "segment",
+            "-segment_time",
+            "3",
+            "-reset_timestamps",
+            "1",
+            seg_pattern,
+        ]
+
+        logger.info("Connecting to RTSP stream for %s (%s)...", cam.id, cam.rtsp_url)
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+            )
+
+            while proc.poll() is None and not stop_event.is_set():
+                current_files = sorted(cam_dir.glob("seg_*.mp4"))
+                if len(current_files) > 1:
+                    for f in current_files[:-1]:
+                        if f not in known_segments:
+                            try:
+                                mtime = f.stat().st_mtime
+                                buffer_mgr.register_segment(cam.id, f, start_ts=mtime - 3.0, duration=3.0)
+                                known_segments.add(f)
+                            except Exception as e:
+                                logger.debug("Error registering segment %s: %s", f, e)
+                try:
+                    buffer_mgr.prune_old_segments()
+                except Exception:
+                    pass
+                time.sleep(1.0)
+
+            if stop_event.is_set():
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                break
+
+            return_code = proc.poll()
+            logger.warning("RTSP stream for %s exited with code %s. Reconnecting in 5s...", cam.id, return_code)
+        except Exception as exc:
+            logger.error("Failed to start RTSP capture for %s: %s. Retrying in 5s...", cam.id, exc)
+
+        stop_event.wait(timeout=5.0)
+
+
 def main():
     field_id = os.getenv("FIELD_ID", "campo-1")
     central_api_url = os.getenv("CENTRAL_API_URL", "http://web:3000")
@@ -80,34 +158,48 @@ def main():
     db_path = Path(os.getenv("DB_PATH", "/app/data/queue.db"))
     port = int(os.getenv("PORT", "8000"))
     host = os.getenv("HOST", "0.0.0.0")
-    mock_feed = os.getenv("MOCK_CAMERA_FEED", "true").lower() in ("true", "1", "yes")
+    mock_feed = os.getenv("MOCK_CAMERA_FEED", "false").lower() in ("true", "1", "yes")
 
     buffer_dir.mkdir(parents=True, exist_ok=True)
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    cameras = [
-        CameraConfig(
-            id="cam-1",
-            name="Câmera Lateral / Linha Central",
-            rtsp_url="rtsp://simulated-cam1/live",
-            order=1,
-            is_active=True,
-        ),
-        CameraConfig(
-            id="cam-2",
-            name="Câmera Gol Norte",
-            rtsp_url="rtsp://simulated-cam2/live",
-            order=2,
-            is_active=True,
-        ),
-        CameraConfig(
-            id="cam-3",
-            name="Câmera Gol Sul (Offline)",
-            rtsp_url="rtsp://simulated-cam3/live",
-            order=3,
-            is_active=False,
-        ),
-    ]
+    config_path = os.getenv("CONFIG_PATH")
+    cameras_json = os.getenv("CAMERAS_JSON")
+
+    if config_path and Path(config_path).is_file():
+        agent_config = load_agent_config(Path(config_path))
+        cameras = agent_config.cameras
+    elif cameras_json:
+        try:
+            raw_cams = json.loads(cameras_json)
+            cameras = [CameraConfig.model_validate(c) for c in raw_cams]
+        except Exception as e:
+            logger.error("Failed to parse CAMERAS_JSON: %s", e)
+            cameras = []
+    else:
+        cameras = [
+            CameraConfig(
+                id="cam-1",
+                name="Câmera Lateral",
+                rtsp_url=os.getenv("RTSP_CAM_1", "rtsp://camera1:554/stream1"),
+                order=1,
+                is_active=True,
+            ),
+            CameraConfig(
+                id="cam-2",
+                name="Câmera Gol Norte",
+                rtsp_url=os.getenv("RTSP_CAM_2", "rtsp://camera2:554/stream1"),
+                order=2,
+                is_active=True,
+            ),
+            CameraConfig(
+                id="cam-3",
+                name="Câmera Gol Sul",
+                rtsp_url=os.getenv("RTSP_CAM_3", "rtsp://camera3:554/stream1"),
+                order=3,
+                is_active=True,
+            ),
+        ]
 
     agent_config = AgentConfig(
         field_id=field_id,
@@ -143,6 +235,17 @@ def main():
             name="SyntheticFeedThread",
         )
         sim_thread.start()
+    else:
+        logger.info("Real camera mode active (MOCK_CAMERA_FEED=false). Spawning RTSP stream recorders...")
+        for cam in cameras:
+            if cam.is_active:
+                rec_thread = threading.Thread(
+                    target=record_rtsp_stream,
+                    args=(cam, buffer_mgr, stop_event),
+                    daemon=True,
+                    name=f"RTSPRecorder-{cam.id}",
+                )
+                rec_thread.start()
 
     app = create_agent_app(
         config=agent_config,
