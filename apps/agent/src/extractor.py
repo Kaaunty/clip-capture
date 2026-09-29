@@ -107,13 +107,16 @@ class ClipExtractor:
 
             # Calculate offset into first segment if known
             start_offset = 0.0
-            if hasattr(self.buffer_mgr, "_segments") and isinstance(self.buffer_mgr._segments, dict):
-                cam_segs = self.buffer_mgr._segments.get(cam.id, [])
-                for s in cam_segs:
-                    if getattr(s, "segment_path", None) == segments[0] or getattr(s, "path", None) == segments[0]:
-                        if window_start > s.start_ts:
-                            start_offset = window_start - s.start_ts
-                        break
+            if hasattr(self.buffer_mgr, "get_segment_info"):
+                seg_info = self.buffer_mgr.get_segment_info(cam.id, segments[0])
+                if (
+                    seg_info
+                    and hasattr(seg_info, "start_ts")
+                    and isinstance(seg_info.start_ts, (int, float))
+                ):
+                    if window_start > seg_info.start_ts:
+                        start_offset = window_start - seg_info.start_ts
+
 
             output_filename = f"event_{event_id}_cam_{cam.id}.mp4"
             output_path = self.output_dir / output_filename
@@ -139,6 +142,10 @@ class ClipExtractor:
                 )
             except Exception as exc:
                 logger.exception("Failed to extract clip for camera %s", cam.id)
+                try:
+                    output_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
                 results.append(
                     ClipExtractionResult(
                         camera_id=cam.id,
@@ -164,6 +171,7 @@ class ClipExtractor:
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_file: Path | None = None
+        proc_timeout = max(60.0, float(duration) * 3.0)
 
         try:
             if len(inputs) == 1:
@@ -201,6 +209,7 @@ class ClipExtractor:
                     cmd_copy,
                     check=True,
                     capture_output=True,
+                    timeout=proc_timeout,
                 )
                 return
             except subprocess.CalledProcessError as copy_err:
@@ -226,6 +235,7 @@ class ClipExtractor:
                     cmd_reencode,
                     check=True,
                     capture_output=True,
+                    timeout=proc_timeout,
                 )
             except subprocess.CalledProcessError as reencode_err:
                 err_msg = (
@@ -234,6 +244,7 @@ class ClipExtractor:
                     else str(reencode_err)
                 )
                 raise RuntimeError(f"FFmpeg extraction failed (copy and re-encode failed): {err_msg}") from reencode_err
+
 
         finally:
             if manifest_file is not None and manifest_file.exists():

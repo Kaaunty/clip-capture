@@ -166,3 +166,21 @@ def test_manager_initialized_with_agent_config(tmp_path):
     assert "camA" in all_health
     assert "camB" in all_health
     assert all_health["camA"]["status"] == StreamStatus.OFFLINE.value
+
+
+def test_get_segment_info(tmp_path):
+    mgr = CircularBufferManager(buffer_root=tmp_path)
+    seg1 = tmp_path / "seg1.mp4"
+    seg1.write_text("data")
+    mgr.register_segment("cam1", seg1, start_ts=100.0, duration=5.0)
+
+    info = mgr.get_segment_info("cam1", seg1)
+    assert info is not None
+    assert info.camera_id == "cam1"
+    assert info.start_ts == 100.0
+    assert info.duration == 5.0
+
+    # Non-existent segment returns None
+    assert mgr.get_segment_info("cam1", tmp_path / "nonexistent.mp4") is None
+    assert mgr.get_segment_info("cam2", seg1) is None
+

@@ -162,6 +162,25 @@ class CircularBufferManager:
                 if s.overlaps(start_ts, end_ts)
             ]
 
+    def get_segment_info(
+        self,
+        camera_id: str,
+        segment_path: Path | str,
+    ) -> CameraSegment | None:
+        """Return the CameraSegment metadata for a given camera and segment path, or None."""
+        target_path = Path(segment_path)
+        with self._lock:
+            cam_segs = self._segments.get(camera_id, [])
+            for seg in cam_segs:
+                if seg.segment_path == target_path or str(seg.segment_path) == str(target_path):
+                    return seg
+                try:
+                    if seg.segment_path.resolve() == target_path.resolve():
+                        return seg
+                except Exception:
+                    pass
+            return None
+
     def prune_old_segments(
         self,
         max_age_seconds: int,

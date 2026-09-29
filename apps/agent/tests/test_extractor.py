@@ -249,3 +249,64 @@ def test_extractor_defaults_from_config(tmp_path):
     assert results[0].camera_id == "cam1"
     assert results[0].status == "CAMERA_UNAVAILABLE"
 
+
+def test_extractor_ffmpeg_timeout_handled_per_camera(tmp_path):
+    buffer_mgr = MagicMock(spec=CircularBufferManager)
+    extractor = ClipExtractor(buffer_mgr=buffer_mgr, output_dir=tmp_path / "clips")
+
+    seg = tmp_path / "seg.mp4"
+    seg.write_text("data")
+    buffer_mgr.get_segments_for_window.return_value = [seg]
+
+    # cam1 hangs / times out, cam2 succeeds
+    def mock_cut(inputs, out, s, d):
+        if "cam1" in str(out):
+            raise subprocess.TimeoutExpired(cmd="ffmpeg", timeout=60)
+        out.write_text("mp4-content")
+
+    extractor._run_ffmpeg_cut = MagicMock(side_effect=mock_cut)
+
+    cameras = [
+        CameraConfig(id="cam1", name="Gol 1", rtsp_url="rtsp://c1", order=1),
+        CameraConfig(id="cam2", name="Gol 2", rtsp_url="rtsp://c2", order=2),
+    ]
+    profile = CaptureProfileConfig(seconds_before=10, seconds_after=5)
+
+    results = extractor.extract_event_clips(event_id="evt-timeout", trigger_ts=100.0, profile=profile, cameras=cameras)
+    assert len(results) == 2
+    r_cam1 = next(r for r in results if r.camera_id == "cam1")
+    r_cam2 = next(r for r in results if r.camera_id == "cam2")
+
+    assert r_cam1.status == "FAILED"
+    assert r_cam1.output_path is None
+    assert "timed out after 60" in (r_cam1.error or "")
+
+    assert r_cam2.status == "EXTRACTED"
+    assert r_cam2.output_path is not None
+    assert r_cam2.output_path.exists()
+
+
+def test_extractor_cleans_partial_output_on_failure(tmp_path):
+    buffer_mgr = MagicMock(spec=CircularBufferManager)
+    extractor = ClipExtractor(buffer_mgr=buffer_mgr, output_dir=tmp_path / "clips")
+
+    seg = tmp_path / "seg.mp4"
+    seg.write_text("data")
+    buffer_mgr.get_segments_for_window.return_value = [seg]
+
+    def failing_cut_with_partial_file(inputs, out, s, d):
+        out.write_text("corrupted partial content")
+        raise RuntimeError("Encoding crashed mid-stream")
+
+    extractor._run_ffmpeg_cut = MagicMock(side_effect=failing_cut_with_partial_file)
+    camera = CameraConfig(id="cam1", name="Cam 1", rtsp_url="rtsp://dummy")
+    profile = CaptureProfileConfig(seconds_before=5, seconds_after=5)
+
+    results = extractor.extract_event_clips(event_id="evt-partial", trigger_ts=100.0, profile=profile, cameras=[camera])
+    assert len(results) == 1
+    assert results[0].status == "FAILED"
+    # Ensure partial file was unlinked and does not remain on disk
+    expected_output = tmp_path / "clips" / "event_evt-partial_cam_cam1.mp4"
+    assert not expected_output.exists()
+
+
