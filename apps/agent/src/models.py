@@ -1,7 +1,8 @@
 """Pydantic data models for Clip Capture Agent."""
 
+from pathlib import Path
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CameraConfig(BaseModel):
@@ -55,3 +56,34 @@ class ClipMetadata(BaseModel):
     sha256: str | None = None
     status: str = "QUEUED"
     created_at: float | None = None
+
+
+class ClipExtractionResult(BaseModel):
+    """Outcome of clip extraction for a single camera stream."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    camera_id: str
+    status: str
+    output_path: Path | None = None
+    duration: float = 0.0
+    error: str | None = None
+
+    def __init__(
+        self,
+        camera_id: str,
+        status: str,
+        output_path: Path | str | None = None,
+        duration: float = 0.0,
+        error: str | None = None,
+        **kwargs,
+    ):
+        super().__init__(
+            camera_id=camera_id,
+            status=status,
+            output_path=Path(output_path) if output_path is not None else None,
+            duration=float(duration),
+            error=error,
+            **kwargs,
+        )
+
