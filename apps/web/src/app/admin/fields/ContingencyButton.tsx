@@ -12,7 +12,10 @@ export default function ContingencyButton({ fieldId }: { fieldId: string }) {
     try {
       const res = await fetch('/api/v1/trigger-contingency', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer admin-secret-dev',
+        },
         body: JSON.stringify({ fieldId, triggerSource: 'WEB_INTERFACE' }),
       });
       const data = await res.json();
