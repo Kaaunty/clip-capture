@@ -462,3 +462,75 @@ def test_upload_worker_real_db_integration(tmp_path):
     assert event_record["status"] == "COMPLETED"
     assert test_clip_file.exists()  # Retained per 7-day retention policy
 
+
+def test_uploader_startup_recovers_and_uploads_stale_processing_clips(tmp_path):
+    from apps.agent.src.db import LocalQueueDB
+
+    db = LocalQueueDB(db_path=tmp_path / "stale_test.db")
+    # Initialize queue without auto-reset to simulate pre-reboot DB state
+    queue_mgr = EventQueueManager(db=db, reset_stale_on_init=False)
+
+    event_id = queue_mgr.enqueue_trigger(
+        command_id="cmd-stale-1",
+        field_id="field-stale",
+        trigger_source="PHYSICAL_BUTTON",
+        trigger_ts=time.time(),
+    )
+
+    test_file = tmp_path / "stale_clip.mp4"
+    test_file.write_bytes(b"stale-clip-data")
+
+    queue_mgr.add_clip_to_event(
+        event_id=event_id,
+        camera_id="cam_main",
+        file_path=str(test_file),
+        duration=10.0,
+        clip_id="clip_stale_1",
+    )
+
+    # Simulate agent crashed while upload was in progress
+    db.update_clip_status("clip_stale_1", status="PROCESSING")
+    assert db.get_clip("clip_stale_1")["status"] == "PROCESSING"
+
+    # Worker starts up on reboot with reset_stale_on_startup=True
+    worker = UploadWorker(
+        queue_mgr=queue_mgr,
+        central_api_url="https://api.reboot.test",
+        device_token="token-reboot",
+        reset_stale_on_startup=True,
+    )
+
+    # Check that startup_sweep reset the status from PROCESSING to EXTRACTED
+    assert db.get_clip("clip_stale_1")["status"] == "EXTRACTED"
+
+    # Now verify that running process_pending_queue_once uploads the recovered clip
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"status": "CONFIRMED"}
+
+    with patch("httpx.post", return_value=mock_resp):
+        uploaded = worker.process_pending_queue_once()
+        assert uploaded == 1
+
+    assert db.get_clip("clip_stale_1")["status"] == "UPLOADED"
+    worker.stop()
+
+
+def test_uploader_reuses_persistent_client_session(tmp_path):
+    queue_mgr = MagicMock(spec=EventQueueManager)
+    queue_mgr.get_pending_clips.return_value = []
+
+    worker = UploadWorker(
+        queue_mgr=queue_mgr,
+        central_api_url="https://api.test",
+        device_token="token-123",
+    )
+
+    assert isinstance(worker.client, httpx.Client)
+    assert not worker.client.is_closed
+
+    # Verify context manager or stop closes client session
+    worker.close()
+    assert worker.client.is_closed
+
+

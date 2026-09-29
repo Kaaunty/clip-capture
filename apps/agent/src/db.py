@@ -228,6 +228,37 @@ class LocalQueueDB:
             with self.conn:
                 self.conn.execute(query, params)
 
+    def reset_stale_processing_jobs(self, timeout_seconds: float = 300.0) -> int:
+        """Reset clips left in PROCESSING status back to EXTRACTED.
+
+        If timeout_seconds <= 0, resets all PROCESSING clips immediately (e.g. on agent reboot).
+        If timeout_seconds > 0, resets clips updated_at <= (now - timeout_seconds).
+        Returns number of affected clip rows.
+        """
+        now = time.time()
+        with self._lock:
+            with self.conn:
+                if timeout_seconds <= 0:
+                    cursor = self.conn.execute(
+                        """
+                        UPDATE clips
+                        SET status = 'EXTRACTED', updated_at = ?
+                        WHERE status = 'PROCESSING'
+                        """,
+                        (now,),
+                    )
+                else:
+                    cutoff = now - float(timeout_seconds)
+                    cursor = self.conn.execute(
+                        """
+                        UPDATE clips
+                        SET status = 'EXTRACTED', updated_at = ?
+                        WHERE status = 'PROCESSING' AND updated_at <= ?
+                        """,
+                        (now, cutoff),
+                    )
+                return cursor.rowcount
+
     def get_pending_clips(self, now: float | None = None) -> list[dict[str, Any]]:
         """Retrieve clips requiring upload (QUEUED, EXTRACTED, or ready retry FAILED)."""
         current_ts = now if now is not None else time.time()

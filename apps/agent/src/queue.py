@@ -47,10 +47,20 @@ class EventQueueManager:
         db: LocalQueueDB,
         config: AgentConfig | None = None,
         extractor: ClipExtractor | None = None,
+        reset_stale_on_init: bool = True,
     ):
         self.db = db
         self.config = config
         self.extractor = extractor
+        if reset_stale_on_init:
+            self.reset_stale_processing_jobs(timeout_seconds=0.0)
+
+    def reset_stale_processing_jobs(self, timeout_seconds: float = 300.0) -> int:
+        """Reset clips left in PROCESSING status back to EXTRACTED."""
+        count = self.db.reset_stale_processing_jobs(timeout_seconds=timeout_seconds)
+        if count > 0:
+            logger.info("Reset %d stale PROCESSING clips to EXTRACTED", count)
+        return count
 
     def is_duplicate(
         self,

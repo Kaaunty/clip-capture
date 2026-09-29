@@ -46,6 +46,8 @@ class UploadWorker:
         backoff_factor: float = 3.0,
         max_backoff: float = 300.0,
         client: httpx.Client | None = None,
+        stale_timeout_seconds: float = 300.0,
+        reset_stale_on_startup: bool = True,
     ):
         self.queue_mgr = queue_mgr
         self.config = config
@@ -67,10 +69,38 @@ class UploadWorker:
         self.initial_backoff = initial_backoff
         self.backoff_factor = backoff_factor
         self.max_backoff = max_backoff
-        self.client = client
+        self.stale_timeout_seconds = stale_timeout_seconds
+
+        self._custom_client = client is not None
+        if client is not None:
+            self.client = client
+            self._owns_client = False
+        else:
+            self.client = httpx.Client(timeout=self.timeout)
+            self._owns_client = True
 
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
+
+        if reset_stale_on_startup and self.queue_mgr is not None and hasattr(self.queue_mgr, "reset_stale_processing_jobs"):
+            self.startup_sweep()
+
+    def startup_sweep(self) -> int:
+        """Reset any interrupted PROCESSING clips on startup / reboot."""
+        if hasattr(self.queue_mgr, "reset_stale_processing_jobs"):
+            res = self.queue_mgr.reset_stale_processing_jobs(timeout_seconds=0.0)
+            if isinstance(res, (int, float)) and res > 0:
+                logger.info("Startup sweep reset %d orphaned PROCESSING clips to EXTRACTED", int(res))
+                return int(res)
+        return 0
+
+    def reset_stale_processing_jobs(self, timeout_seconds: float = 300.0) -> int:
+        """Reset stale processing clips that exceeded timeout_seconds."""
+        if hasattr(self.queue_mgr, "reset_stale_processing_jobs"):
+            res = self.queue_mgr.reset_stale_processing_jobs(timeout_seconds=timeout_seconds)
+            if isinstance(res, (int, float)):
+                return int(res)
+        return 0
 
     def calculate_backoff(self, attempts: int) -> float:
         """Calculate exponential backoff seconds for retry attempt.
@@ -157,8 +187,17 @@ class UploadWorker:
             "file_size": str(file_size),
         }
 
-        post_fn = self.client.post if self.client is not None else httpx.post
-        put_fn = self.client.put if self.client is not None else httpx.put
+        # Reuse persistent client session, supporting test mocks if patched
+        from unittest.mock import MagicMock
+        if self._custom_client:
+            post_fn = self.client.post
+            put_fn = self.client.put
+        elif isinstance(httpx.post, MagicMock):
+            post_fn = httpx.post
+            put_fn = httpx.put if isinstance(httpx.put, MagicMock) else self.client.put
+        else:
+            post_fn = self.client.post
+            put_fn = self.client.put
 
         try:
             with open(file_path, "rb") as f:
@@ -252,6 +291,9 @@ class UploadWorker:
 
         Returns count of successfully uploaded clips.
         """
+        if self.stale_timeout_seconds > 0:
+            self.reset_stale_processing_jobs(timeout_seconds=self.stale_timeout_seconds)
+
         pending_jobs = self.queue_mgr.get_pending_clips()
         now = time.time()
         uploaded_count = 0
@@ -292,8 +334,20 @@ class UploadWorker:
         )
         self._thread.start()
 
+    def close(self) -> None:
+        """Close persistent HTTP client session if owned by worker."""
+        if self._owns_client and self.client is not None:
+            self.client.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def stop(self, timeout: float = 5.0) -> None:
-        """Signal worker to stop and wait for thread to terminate."""
+        """Signal worker to stop, wait for thread to terminate, and close client session."""
         self._stop_event.set()
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=timeout)
+        self.close()

@@ -241,3 +241,35 @@ def test_schedule_extraction_handles_unexpected_exception(tmp_path):
     # Event status should be marked FAILED on unexpected crash
     evt_record = q.get_event(evt_id)
     assert evt_record["status"] == "FAILED"
+
+
+def test_reboot_recovers_stale_processing_clips(tmp_path):
+    db_file = tmp_path / "queue.db"
+    db = LocalQueueDB(db_path=db_file)
+    q = EventQueueManager(db=db)
+
+    evt_id = q.enqueue_trigger(
+        command_id="cmd-reboot-test",
+        field_id="f1",
+        trigger_source="PHYSICAL_BUTTON",
+        trigger_ts=time.time(),
+    )
+    job = q.add_clip_to_event(
+        event_id=evt_id,
+        camera_id="cam1",
+        file_path="/tmp/c_reboot.mp4",
+        duration=10.0,
+    )
+
+    # Mark clip processing as if an upload was mid-flight
+    q.mark_clip_processing(job.clip_id)
+    assert db.get_clip(job.clip_id)["status"] == "PROCESSING"
+
+    # Simulate agent crash & reboot: new EventQueueManager initialized on same DB
+    rebooted_q = EventQueueManager(db=db, reset_stale_on_init=True)
+
+    # Verify clip status was recovered back to EXTRACTED and is pending upload
+    clip_after_reboot = db.get_clip(job.clip_id)
+    assert clip_after_reboot["status"] == "EXTRACTED"
+    pending = rebooted_q.get_pending_clips()
+    assert any(c.clip_id == job.clip_id for c in pending)
