@@ -1,0 +1,11 @@
+.badge { display: inline-block; }
+.md { padding: 4px 10px; border-radius: var(--radius-pill); font-size: 12px; }
+.sm { padding: 2px 8px; border-radius: var(--radius-4); font-size: 11px; }
+.w500 { font-weight: 500; }
+.w600 { font-weight: 600; }
+.w700 { font-weight: 700; }
+.success { background-color: var(--color-success-soft); color: var(--color-success); }
+.danger { background-color: var(--color-danger-soft); color: var(--color-danger); }
+.warning { background-color: var(--color-warning-soft); color: var(--color-warning); }
+.info, .primary { background-color: var(--color-primary-soft); color: var(--color-primary-dark); }
+.neutral { background-color: var(--color-surface-muted); color: var(--color-text-600); }

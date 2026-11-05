@@ -1,0 +1,7 @@
+.table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+.th { background-color: var(--color-surface-muted); font-weight: 600; color: var(--color-text-600); border-bottom: 1px solid var(--color-border); }
+.th10 { padding: 10px 14px; }
+.th12 { padding: 12px 14px; }
+.td { border-bottom: 1px solid var(--color-border-subtle); color: var(--color-text-700); }
+.td12 { padding: 12px 14px; }
+.td14 { padding: 14px; }
