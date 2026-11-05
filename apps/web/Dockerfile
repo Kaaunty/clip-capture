@@ -12,7 +12,6 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY package*.json ./
 COPY prisma ./prisma/
 COPY src ./src
-COPY scripts ./scripts
 COPY public ./public
 COPY next.config.js tsconfig.json ./
 RUN npx prisma generate
@@ -27,7 +26,6 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/src ./src
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
