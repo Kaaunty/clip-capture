@@ -1,0 +1,7 @@
+.empty {
+  padding: 32px;
+  text-align: center;
+  background-color: var(--color-surface-alt);
+  border-radius: var(--radius-12);
+  color: var(--color-text-500);
+}

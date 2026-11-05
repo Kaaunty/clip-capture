@@ -1,0 +1,130 @@
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 20px;
+  font-family: var(--font-sans);
+  color: var(--color-text-900);
+  background-color: var(--color-surface-alt);
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.card {
+  margin-bottom: 24px;
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-text-900);
+  margin: 0 0 6px 0;
+}
+
+.fieldName {
+  font-size: 15px;
+  color: var(--color-text-500);
+  margin: 0;
+}
+
+.metaGrid {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.table {
+  margin-bottom: 16px;
+}
+
+.tdMiddle {
+  vertical-align: middle;
+}
+
+.code {
+  font-size: 11px;
+  color: var(--color-text-500);
+}
+
+.notSent {
+  color: var(--color-text-400);
+  font-size: 12px;
+}
+
+.done {
+  color: var(--color-success);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.shareSection {
+  margin-top: 24px;
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 20px;
+}
+
+.shareTitle {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.shareText {
+  font-size: 14px;
+  color: var(--color-text-500);
+  margin: 0 0 12px 0;
+}
+
+.notFound {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-16);
+  padding: 48px 32px;
+  text-align: center;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
+  max-width: 500px;
+  margin: 60px auto;
+}
+
+.notFoundIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.notFoundTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-danger);
+  margin: 0 0 12px 0;
+}
+
+.notFoundText {
+  font-size: 14px;
+  color: var(--color-text-500);
+  margin-bottom: 24px;
+}

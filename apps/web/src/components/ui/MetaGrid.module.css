@@ -1,0 +1,12 @@
+.grid {
+  display: grid;
+  gap: 16px;
+  background-color: var(--color-surface-alt);
+  padding: 16px;
+  border-radius: var(--radius-10);
+}
+.c220 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.c200 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.item { display: flex; flex-direction: column; gap: 4px; }
+.label { font-size: 12px; text-transform: uppercase; color: var(--color-text-500); font-weight: 600; }
+.value { font-size: 14px; font-weight: 600; color: var(--color-text-800); }

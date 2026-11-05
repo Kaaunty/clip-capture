@@ -1,0 +1,139 @@
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 20px;
+  font-family: var(--font-sans);
+  color: var(--color-text-900);
+  background-color: var(--color-surface-alt);
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.header {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-16);
+  padding: 24px 32px;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--color-text-900);
+  margin: 0 0 6px 0;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--color-text-500);
+  margin: 0;
+}
+
+.fieldGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.fieldName {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text-800);
+  margin: 0 0 8px 0;
+}
+
+.cardMeta {
+  font-size: 12px;
+  color: var(--color-text-500);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Badge md e inline-block por padrao; aqui precisa ser inline-flex com gap. */
+.agentBadge.agentBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.warning {
+  margin-bottom: 20px;
+}
+
+.metaGrid {
+  margin-bottom: 20px;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-700);
+  margin: 18px 0 10px 0;
+}
+
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.sectionHeadTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-700);
+  margin: 0;
+}
+
+.emptyNotice {
+  color: var(--color-text-400);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.emptyNoticeSpaced {
+  margin-bottom: 16px;
+}
+
+.table {
+  margin-bottom: 20px;
+}
+
+.code {
+  font-size: 12px;
+  color: var(--color-text-500);
+}
+
+.link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.contingency {
+  margin-top: 20px;
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 16px;
+}

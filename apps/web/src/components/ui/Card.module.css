@@ -1,0 +1,16 @@
+.card { background-color: var(--color-surface); }
+.bordered { border: 1px solid var(--color-border); }
+.r10 { border-radius: var(--radius-10); }
+.r12 { border-radius: var(--radius-12); }
+.r14 { border-radius: var(--radius-14); }
+.r16 { border-radius: var(--radius-16); }
+.p0 { padding: 0; }
+.p16 { padding: 16px; }
+.p24 { padding: 24px; }
+.p28 { padding: 28px; }
+.p32 { padding: 32px; }
+.sh_none { box-shadow: none; }
+.sh_xs { box-shadow: var(--shadow-xs); }
+.sh_sm { box-shadow: var(--shadow-sm); }
+.sh_card { box-shadow: var(--shadow-card); }
+.sh_md { box-shadow: var(--shadow-md); }

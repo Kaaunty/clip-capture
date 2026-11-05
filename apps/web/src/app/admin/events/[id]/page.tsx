@@ -1,147 +1,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { prisma } from '../../../../lib/db';
+import { statusTone } from '../../../../lib/statusTone';
+import { Badge, Card, MetaGrid, MetaItem, Table, Td, Th } from '../../../../components/ui';
 import ShareActions from './ShareActions';
 import RetryButton from './RetryButton';
+import s from './page.module.css';
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ id: string }>;
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    maxWidth: '1100px',
-    margin: '0 auto',
-    padding: '32px 20px',
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-    color: '#0f172a',
-    backgroundColor: '#f8fafc',
-    minHeight: '100vh',
-    boxSizing: 'border-box',
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: '16px',
-    padding: '32px',
-    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.06)',
-    border: '1px solid #e2e8f0',
-    marginBottom: '24px',
-  },
-  notFoundCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: '16px',
-    padding: '48px 32px',
-    textAlign: 'center',
-    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.06)',
-    border: '1px solid #e2e8f0',
-    maxWidth: '500px',
-    margin: '60px auto',
-  },
-  backLink: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    color: '#0284c7',
-    textDecoration: 'none',
-    fontWeight: '600',
-    fontSize: '14px',
-    marginBottom: '20px',
-  },
-  headerRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
-    gap: '16px',
-    borderBottom: '1px solid #f1f5f9',
-    paddingBottom: '20px',
-    marginBottom: '20px',
-  },
-  title: {
-    fontSize: '24px',
-    fontWeight: '800',
-    color: '#0f172a',
-    margin: '0 0 6px 0',
-  },
-  fieldName: {
-    fontSize: '15px',
-    color: '#64748b',
-    margin: 0,
-  },
-  metaGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '16px',
-    backgroundColor: '#f8fafc',
-    padding: '16px',
-    borderRadius: '10px',
-    marginBottom: '24px',
-  },
-  metaItem: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-  },
-  metaLabel: {
-    fontSize: '12px',
-    textTransform: 'uppercase',
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  metaValue: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    textAlign: 'left',
-    fontSize: '14px',
-    marginBottom: '16px',
-  },
-  th: {
-    backgroundColor: '#f1f5f9',
-    padding: '12px 14px',
-    fontWeight: '600',
-    color: '#475569',
-    borderBottom: '1px solid #e2e8f0',
-  },
-  td: {
-    padding: '14px',
-    borderBottom: '1px solid #f1f5f9',
-    color: '#334155',
-    verticalAlign: 'middle',
-  },
-};
-
-function getStatusBadgeStyle(status: string): React.CSSProperties {
-  let bg = '#fef3c7';
-  let color = '#b45309';
-
-  if (status === 'READY' || status === 'COMPLETED') {
-    bg = '#dcfce7';
-    color = '#15803d';
-  } else if (status === 'FAILED' || status === 'CAMERA_UNAVAILABLE') {
-    bg = '#fee2e2';
-    color = '#b91c1c';
-  } else if (status === 'PROCESSING' || status === 'UPLOADING') {
-    bg = '#e0f2fe';
-    color = '#0369a1';
-  }
-
-  return {
-    display: 'inline-block',
-    padding: '4px 10px',
-    borderRadius: '9999px',
-    fontSize: '12px',
-    fontWeight: '700',
-    backgroundColor: bg,
-    color: color,
-  };
 }
 
 export default async function AdminEventPage({ params }: PageProps) {
@@ -169,16 +38,16 @@ export default async function AdminEventPage({ params }: PageProps) {
 
   if (!event) {
     return (
-      <main style={styles.container}>
-        <div style={styles.notFoundCard}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
-          <h1 style={{ fontSize: '20px', fontWeight: '700', color: '#b91c1c', margin: '0 0 12px 0' }}>
+      <main className={s.page}>
+        <div className={s.notFound}>
+          <div className={s.notFoundIcon}>🔍</div>
+          <h1 className={s.notFoundTitle}>
             Evento não encontrado
           </h1>
-          <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
+          <p className={s.notFoundText}>
             O identificador de evento fornecido não corresponde a nenhum registro operacional.
           </p>
-          <Link href="/admin/fields" style={styles.backLink}>
+          <Link href="/admin/fields" className={s.backLink}>
             ← Voltar para Painel de Campos
           </Link>
         </div>
@@ -229,59 +98,47 @@ export default async function AdminEventPage({ params }: PageProps) {
   }
 
   return (
-    <main style={styles.container}>
-      <Link href="/admin/fields" style={styles.backLink}>
+    <main className={s.page}>
+      <Link href="/admin/fields" className={s.backLink}>
         ← Voltar para Painel de Campos
       </Link>
 
-      <section style={styles.card}>
-        <div style={styles.headerRow}>
+      <Card as="section" padding={32} className={s.card}>
+        <div className={s.headerRow}>
           <div>
-            <h1 style={styles.title}>Detalhes do Evento: {event.id}</h1>
-            <p style={styles.fieldName}>
+            <h1 className={s.title}>Detalhes do Evento: {event.id}</h1>
+            <p className={s.fieldName}>
               Campo: <strong>{event.field?.name || event.fieldId}</strong>
             </p>
           </div>
           <div>
-            <span style={getStatusBadgeStyle(event.status)}>{event.status}</span>
+            <Badge tone={statusTone(event.status)}>{event.status}</Badge>
           </div>
         </div>
 
-        <div style={styles.metaGrid}>
-          <div style={styles.metaItem}>
-            <span style={styles.metaLabel}>Origem do Disparo</span>
-            <span style={styles.metaValue}>{event.triggerSource}</span>
-          </div>
-          <div style={styles.metaItem}>
-            <span style={styles.metaLabel}>Command ID</span>
-            <span style={styles.metaValue}>{event.commandId}</span>
-          </div>
-          <div style={styles.metaItem}>
-            <span style={styles.metaLabel}>Data/Hora do Acionamento</span>
-            <span style={styles.metaValue}>
-              {new Date(event.triggeredAt || event.createdAt).toLocaleString('pt-BR', {
-                timeZone: 'America/Sao_Paulo',
-              })}
-            </span>
-          </div>
-          <div style={styles.metaItem}>
-            <span style={styles.metaLabel}>Ângulos Gravados</span>
-            <span style={styles.metaValue}>{angles.length}</span>
-          </div>
-        </div>
+        <MetaGrid minColumn={200} className={s.metaGrid}>
+          <MetaItem label="Origem do Disparo">{event.triggerSource}</MetaItem>
+          <MetaItem label="Command ID">{event.commandId}</MetaItem>
+          <MetaItem label="Data/Hora do Acionamento">
+            {new Date(event.triggeredAt || event.createdAt).toLocaleString('pt-BR', {
+              timeZone: 'America/Sao_Paulo',
+            })}
+          </MetaItem>
+          <MetaItem label="Ângulos Gravados">{angles.length}</MetaItem>
+        </MetaGrid>
 
-        <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>
+        <h2 className={s.sectionTitle}>
           Status dos Ângulos de Câmera
         </h2>
 
-        <table style={styles.table}>
+        <Table className={s.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Câmera</th>
-              <th style={styles.th}>Status de Processamento / Upload</th>
-              <th style={styles.th}>Duração</th>
-              <th style={styles.th}>Caminho Storage / Hash</th>
-              <th style={styles.th}>Ação</th>
+              <Th py={12}>Câmera</Th>
+              <Th py={12}>Status de Processamento / Upload</Th>
+              <Th py={12}>Duração</Th>
+              <Th py={12}>Caminho Storage / Hash</Th>
+              <Th py={12}>Ação</Th>
             </tr>
           </thead>
           <tbody>
@@ -293,27 +150,27 @@ export default async function AdminEventPage({ params }: PageProps) {
 
               return (
                 <tr key={angle.id}>
-                  <td style={styles.td}>
+                  <Td py={14} className={s.tdMiddle}>
                     <strong>{angle.cameraName}</strong>
-                  </td>
-                  <td style={styles.td}>
-                    <span style={getStatusBadgeStyle(angle.uploadStatus)}>
+                  </Td>
+                  <Td py={14} className={s.tdMiddle}>
+                    <Badge tone={statusTone(angle.uploadStatus)}>
                       {angle.uploadStatus}
-                    </span>
-                  </td>
-                  <td style={styles.td}>
+                    </Badge>
+                  </Td>
+                  <Td py={14} className={s.tdMiddle}>
                     {angle.duration ? `${angle.duration.toFixed(1)}s` : '-'}
-                  </td>
-                  <td style={styles.td}>
+                  </Td>
+                  <Td py={14} className={s.tdMiddle}>
                     {angle.storagePath ? (
-                      <code style={{ fontSize: '11px', color: '#64748b' }}>
+                      <code className={s.code}>
                         {angle.storagePath}
                       </code>
                     ) : (
-                      <span style={{ color: '#94a3b8', fontSize: '12px' }}>Não enviado</span>
+                      <span className={s.notSent}>Não enviado</span>
                     )}
-                  </td>
-                  <td style={styles.td}>
+                  </Td>
+                  <Td py={14} className={s.tdMiddle}>
                     {needsRetry ? (
                       <RetryButton
                         fileId={angle.fileId}
@@ -321,27 +178,27 @@ export default async function AdminEventPage({ params }: PageProps) {
                         eventId={event.id}
                       />
                     ) : (
-                      <span style={{ color: '#15803d', fontSize: '13px', fontWeight: '600' }}>
+                      <span className={s.done}>
                         ✓ Concluído
                       </span>
                     )}
-                  </td>
+                  </Td>
                 </tr>
               );
             })}
           </tbody>
-        </table>
+        </Table>
 
-        <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
+        <div className={s.shareSection}>
+          <h2 className={s.shareTitle}>
             Compartilhamento Público
           </h2>
-          <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 12px 0' }}>
+          <p className={s.shareText}>
             Gere um link temporário com token seguro para visualização externa dos vídeos prontos.
           </p>
           <ShareActions eventId={event.id} initialShareUrl={undefined} />
         </div>
-      </section>
+      </Card>
     </main>
   );
 }

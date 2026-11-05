@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { cx } from '../../../../components/ui';
+import s from './RetryButton.module.css';
 
 export default function RetryButton({
   fileId,
@@ -42,21 +44,12 @@ export default function RetryButton({
       <button
         onClick={handleRetry}
         disabled={retrying}
-        style={{
-          padding: '6px 12px',
-          fontSize: '12px',
-          fontWeight: '600',
-          borderRadius: '6px',
-          border: '1px solid #cbd5e1',
-          backgroundColor: '#ffffff',
-          color: '#334155',
-          cursor: retrying ? 'not-allowed' : 'pointer',
-        }}
+        className={cx(s.retry, retrying && s.retryBusy)}
       >
         {retrying ? 'Retentando...' : retried ? '✓ Retentativa Agendada' : '🔄 Retentar Upload'}
       </button>
       {error && (
-        <span style={{ color: '#dc2626', fontSize: '11px', display: 'block', marginTop: '2px' }}>
+        <span className={s.error}>
           {error}
         </span>
       )}
