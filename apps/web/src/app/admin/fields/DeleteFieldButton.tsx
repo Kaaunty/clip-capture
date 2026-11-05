@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Button } from '../../../components/ui';
 
 export default function DeleteFieldButton({ fieldId, fieldName }: { fieldId: string; fieldName: string }) {
   const [loading, setLoading] = useState(false);
@@ -27,22 +28,14 @@ export default function DeleteFieldButton({ fieldId, fieldName }: { fieldId: str
   };
 
   return (
-    <button
+    <Button
+      variant="dangerOutline"
+      size="xs"
       onClick={handleDelete}
       disabled={loading}
       title="Excluir este campo"
-      style={{
-        background: 'none',
-        border: '1px solid #fee2e2',
-        color: '#dc2626',
-        borderRadius: '6px',
-        padding: '4px 8px',
-        fontSize: '12px',
-        fontWeight: '600',
-        cursor: 'pointer',
-      }}
     >
       {loading ? '...' : '🗑️ Excluir'}
-    </button>
+    </Button>
   );
 }

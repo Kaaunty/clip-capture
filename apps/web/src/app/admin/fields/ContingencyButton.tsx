@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Button, cx } from '../../../components/ui';
+import s from './ContingencyButton.module.css';
 
 export default function ContingencyButton({ fieldId }: { fieldId: string }) {
   const [loading, setLoading] = useState(false);
@@ -41,39 +43,20 @@ export default function ContingencyButton({ fieldId }: { fieldId: string }) {
   };
 
   return (
-    <div style={{ marginTop: '12px' }}>
-      <button
+    <div className={s.wrap}>
+      <Button
+        variant="danger"
+        elevated
         onClick={handleTrigger}
         disabled={loading}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          backgroundColor: '#dc2626',
-          color: '#ffffff',
-          fontWeight: '600',
-          fontSize: '14px',
-          padding: '10px 18px',
-          borderRadius: '8px',
-          border: 'none',
-          cursor: loading ? 'not-allowed' : 'pointer',
-          opacity: loading ? 0.7 : 1,
-          boxShadow: '0 2px 4px rgba(220, 38, 38, 0.25)',
-          transition: 'all 0.2s',
-        }}
+        className={s.trigger}
       >
-        <span style={{ marginRight: '6px' }}>🚨</span>
+        <span>🚨</span>
         {loading ? 'Disparando...' : 'Disparar Lance (Contingência Web)'}
-      </button>
+      </Button>
 
       {feedback && (
-        <div
-          style={{
-            marginTop: '8px',
-            fontSize: '13px',
-            fontWeight: '500',
-            color: feedback.type === 'success' ? '#15803d' : '#b91c1c',
-          }}
-        >
+        <div className={cx(s.feedback, feedback.type === 'success' ? s.success : s.error)}>
           {feedback.message}
         </div>
       )}

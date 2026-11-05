@@ -1,0 +1,23 @@
+.wrap {
+  margin-top: 12px;
+}
+
+/* Button danger elevated ja cobre cor, raio, padding e sombra. Aqui: sem borda e transicao. */
+.trigger.trigger {
+  border: none;
+  transition: all 0.2s;
+}
+
+.feedback {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.success {
+  color: var(--color-success);
+}
+
+.error {
+  color: var(--color-danger);
+}

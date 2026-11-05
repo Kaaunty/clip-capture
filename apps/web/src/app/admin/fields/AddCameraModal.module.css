@@ -1,0 +1,50 @@
+.trigger {
+  background-color: var(--color-surface-muted);
+  border: 1px solid var(--color-border-strong);
+  padding: 6px 12px;
+  border-radius: var(--radius-6);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text-900);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Campo da URL: margem inferior 20px (Field so aceita 16 ou 14). */
+.lastField.lastField {
+  margin-bottom: 20px;
+}
+
+/* Alert error: padding 10px e margem 14px (padrao do Alert e 10px 14px / 16px). */
+.errBox.errBox {
+  padding: 10px;
+  margin-bottom: 14px;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cancelBtn {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  padding: 8px 14px;
+  border-radius: var(--radius-6);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.submitBtn {
+  background-color: var(--color-primary);
+  color: var(--color-surface);
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-6);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}

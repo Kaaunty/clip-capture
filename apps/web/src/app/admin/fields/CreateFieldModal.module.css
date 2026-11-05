@@ -1,0 +1,106 @@
+/* Botao primario sem borda (ui Button tem 1px transparent por padrao). */
+.flush.flush {
+  border: none;
+}
+
+.errBox {
+  margin-bottom: 16px;
+}
+
+.row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* Field usa margin-bottom 16px; dentro da linha de 2 colunas precisa ser 0. */
+.half.half {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.camSection {
+  margin-bottom: 20px;
+}
+
+.camHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.camLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-700);
+}
+
+.addAngle {
+  background-color: var(--color-surface-muted);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-6);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text-600);
+}
+
+.camList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.camRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background-color: var(--color-surface-alt);
+  padding: 10px;
+  border-radius: var(--radius-8);
+  border: 1px solid var(--color-border);
+}
+
+.camNameInput {
+  width: 140px;
+  padding: 8px;
+  border-radius: var(--radius-6);
+  border: 1px solid var(--color-border-strong);
+  font-size: 13px;
+}
+
+.camUrlInput {
+  flex: 1;
+  padding: 8px;
+  border-radius: var(--radius-6);
+  border: 1px solid var(--color-border-strong);
+  font-size: 13px;
+}
+
+.removeCam {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 14px;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.cancelBtn {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  padding: 10px 16px;
+  border-radius: var(--radius-8);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text-600);
+}
