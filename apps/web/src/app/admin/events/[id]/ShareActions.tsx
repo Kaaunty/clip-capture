@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { cx } from '../../../../components/ui';
+import s from './ShareActions.module.css';
 
 interface ShareActionsProps {
   eventId: string;
@@ -45,53 +47,31 @@ export default function ShareActions({ eventId, initialShareUrl }: ShareActionsP
   };
 
   return (
-    <div style={{ marginTop: '16px' }}>
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+    <div className={s.wrapper}>
+      <div className={s.actions}>
         <button
           onClick={handleGenerateShareToken}
           disabled={loading}
-          style={{
-            backgroundColor: '#0284c7',
-            color: '#ffffff',
-            padding: '10px 18px',
-            borderRadius: '8px',
-            border: 'none',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
-          }}
+          className={cx(s.generate, loading && s.generateBusy)}
         >
           {loading ? 'Gerando...' : '🔗 Gerar Link de Compartilhamento'}
         </button>
 
         {shareUrl && (
-          <button
-            onClick={handleCopyLink}
-            style={{
-              backgroundColor: '#f1f5f9',
-              color: '#334155',
-              padding: '10px 18px',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
+          <button onClick={handleCopyLink} className={s.copy}>
             📋 Copiar Link Público
           </button>
         )}
       </div>
 
       {shareUrl && (
-        <div style={{ marginTop: '12px' }}>
-          <span style={{ fontSize: '13px', color: '#64748b' }}>Link de visualização pública: </span>
+        <div className={s.urlRow}>
+          <span className={s.urlLabel}>Link de visualização pública: </span>
           <a
             href={shareUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ fontSize: '14px', color: '#0284c7', fontWeight: '600', wordBreak: 'break-all' }}
+            className={s.url}
           >
             {shareUrl}
           </a>
@@ -99,7 +79,7 @@ export default function ShareActions({ eventId, initialShareUrl }: ShareActionsP
       )}
 
       {message && (
-        <div style={{ marginTop: '8px', fontSize: '13px', color: '#15803d', fontWeight: '500' }}>
+        <div className={s.message}>
           {message}
         </div>
       )}
